@@ -34,14 +34,16 @@ const int KEY_ESC = 27;
 const int MAP_SIZE = 150;
 //terrain types
 const int DIRT = 0;
-const int TREE = 1;
-const int FLOOR = 2;
-const int WALL = 3;
-const int DOOR = 4;
-const int TERRAIN_TYPES = 5; //this should be 1 more than the highest terrain type
-const char terrain_chars[] = {'.','T','.','#','+'};
-const int terrain_colours[] = {COLOR_GREEN,COLOR_GREEN,COLOR_WHITE,COLOR_WHITE,COLOR_WHITE};
-const char* terrain_descriptors[] = {"soil", "a tree", "a paved floor", "a wall","a door"};
+const int STREE = 1;
+const int BTREE = 2;
+const int FLOOR = 3;
+const int WALL = 4;
+const int DOOR = 5;
+const int TERRAIN_TYPES = 6; //this should be 1 more than the highest terrain type
+const char terrain_chars[] = {'.','t','T','.','#','+'};
+const int terrain_colours[] = {COLOR_GREEN,COLOR_GREEN,COLOR_GREEN,COLOR_WHITE,COLOR_WHITE,COLOR_WHITE};
+const char* terrain_descriptors[] = {"soil", "a small tree", "a big tree", "a paved floor", "a wall","a door"};
+bool debug = false;
 
 const int WAVELENGTHS = 5;
 int map_terrain[MAP_SIZE][MAP_SIZE];
@@ -367,7 +369,7 @@ void make_room(pair<int,int> centre, pair<int,int> size)
 		{
 			if(i==0 || i == xsize+1 || j==0 || j==ysize+1)
 			{
-				if (map_terrain[i+x-xsize/2][j+y-ysize/2] == DIRT || map_terrain[i+x-xsize/2][j+y-ysize/2] == TREE)
+				if (map_terrain[i+x-xsize/2][j+y-ysize/2] == DIRT || map_terrain[i+x-xsize/2][j+y-ysize/2] == STREE || map_terrain[i+x-xsize/2][j+y-ysize/2] == BTREE)
 				{
 					map_terrain[i+x-xsize/2][j+y-ysize/2] = WALL;
 					if(!is_corner_a(i,j,xsize+1,ysize+1))
@@ -424,7 +426,7 @@ pair<int,int> can_make_room(pair<int,int> xy,int xcentre,int ycentre)
 			if(map_access[i+x-xsize/2][j+y-ysize/2]) {return make_pair(0,0);}
 			if(i==0 || i == xsize+1 || j==0 || j==ysize+1)
 			{
-				if (map_terrain[i+x-xsize/2][j+y-ysize/2] == DIRT || map_terrain[i+x-xsize/2][j+y-ysize/2] == TREE)
+				if (map_terrain[i+x-xsize/2][j+y-ysize/2] == DIRT || map_terrain[i+x-xsize/2][j+y-ysize/2] == STREE || map_terrain[i+x-xsize/2][j+y-ysize/2] == BTREE)
 				{
 					if(!is_corner_a(i,j,xsize+1,ysize+1))
 					{ outer_walls++; }
@@ -472,10 +474,21 @@ void init_map()
 			map_access[x][y] = false;
 			map_human_scent[x][y] = 0.0;
 			if(x != 0 && x != MAP_SIZE-1 && y != 0 && y != MAP_SIZE-1)
-				map_terrain[x][y] = rand() % 2;
+			{
+				switch(rand()%11)
+				{
+				case 0: case 1: case 2: case 3:
+					map_terrain[x][y] = STREE; break;
+				case 4: case 5: case 6:
+					map_terrain[x][y] = BTREE;break;
+				default:
+					map_terrain[x][y] = DIRT;
+				}
+			}
 			else
+			{
 				map_terrain[x][y] = WALL;
-			//TODO make interesting map
+			}
 		}
 	}
 	int buildings = (rand()%3)+5;
@@ -586,6 +599,11 @@ bool is_wall(int x, int y)
 	return map_terrain[x][y] == WALL;
 }
 
+bool is_opaque(int x, int y)
+{
+	return map_terrain[x][y] == WALL || map_terrain[x][y] == BTREE;
+}
+
 void init_items()
 {
 	ammo[PISTOL] = 150;
@@ -633,6 +651,26 @@ void draw_stats()
 	mvprintw(3,viewport_width,"HP: %d/%d    ",p_ptr->health,p_ptr->sspecies->min_health);
 	mvprintw(4,viewport_width,"Ammo: %d,%d,%d      ",ammo[PISTOL],ammo[RIFLE],ammo[CANNON]);
 }
+void draw_tile_debug(int x, int y)
+{
+	char ch = terrain_chars[map_terrain[x][y]];
+	int colour = terrain_colours[map_terrain[x][y]];
+	if (!map_seen[x][y])
+	{draw_ch(x,y,' ',colour); return;}
+	if (map_items[x][y] != NULL)
+	{
+		ch = map_items[x][y]->ch;
+		colour = map_items[x][y]->colour;
+	}
+	if (map_occupants[x][y] != NULL)
+	{
+
+			ch = map_occupants[x][y]->sspecies->ch;
+			colour = map_occupants[x][y]->sspecies->colour;
+
+	}
+	draw_ch(x,y,ch,colour);
+}
 
 bool los_exists(int x1, int y1, int x2, int y2)
 {
@@ -667,7 +705,9 @@ bool los_exists(int x1, int y1, int x2, int y2)
             error += delta_y;
 			if (true)//(x1 != x2 && y1 != y2)
 			{
-				if (is_wall(x1, y1)) return false;
+				if(debug)
+				{draw_ch(x1,y1,'&',COLOR_WHITE); getch();draw_tile_debug(x1,y1);}
+				if (is_opaque(x1, y1)) return false;
 			}
         }
     }
@@ -1158,13 +1198,15 @@ void player_turn(actor* a)
 		case '.':
 			turn = 0; break;
 		case 'X':
-			turn = 0; add_message("You wield your pistol."); current_weapon = PISTOL; break;
+			if(current_weapon == PISTOL) {turn = 0; add_message("You wield your pistol."); current_weapon = PISTOL;} break;
 		case 'Y':
-			turn = 0; add_message("You wield your automatic rifle!"); current_weapon = RIFLE; break;
+			if(current_weapon == RIFLE) {turn = 0; add_message("You wield your automatic rifle!"); current_weapon = RIFLE;} break;
 		case 'Z':
-			turn = 0; add_message("You get out the plasma cannon!!"); current_weapon = CANNON; break;
+			if(current_weapon == CANNON) {turn = 0; add_message("You get out the plasma cannon!!"); current_weapon = CANNON;} break;
 		case 'r':
-			add_message("The radio signal is "+signal_strength(p_ptr->x,p_ptr->y)); draw_last_msg(); break;
+			turn = 0; add_message("The radio signal is "+signal_strength(p_ptr->x,p_ptr->y)); draw_last_msg(); break;
+		case 'd':
+			debug = !debug; break;
 		case 'f':
 			{
 				bool fire_mode = true;
