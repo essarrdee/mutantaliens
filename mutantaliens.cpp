@@ -5,19 +5,23 @@
 #include <vector>
 #include <algorithm>
 #include <string>
+#include <math.h>
 
 #pragma warning(disable: 4996)
 
 /* TODO
 make devices have an effect
 make devices throwable, activateable, hideable, droppable, pickupable, remotable, timerable
+make guns structs
+make monsters spawn
 make monsters react to smell
-make monsters react to sight
-make monsters react to psi (done?)
-make monsters react to sound
-make monsters wander in the absense of information
+make monsters react better to sound, make sounds interesting
+make monsters follow other monters to the player
+make pack monsters try to maintain distance from player while a group assembles, before closing in
 make detailed species descriptions
 make monster memory
+make buildings multilevel
+make the plot stuff
 */
 
 #define arrayend(ar)  ar + (sizeof(ar) / sizeof(ar[0]))
@@ -33,10 +37,11 @@ const int DIRT = 0;
 const int TREE = 1;
 const int FLOOR = 2;
 const int WALL = 3;
-const int TERRAIN_TYPES = 4; //this should be 1 more than the highest terrain type
-const char terrain_chars[] = {'.','T','.','#'};
-const int terrain_colours[] = {COLOR_GREEN,COLOR_GREEN,COLOR_WHITE,COLOR_WHITE};
-const char* terrain_descriptors[] = {"soil", "a tree", "a paved floor", "a wall"};
+const int DOOR = 4;
+const int TERRAIN_TYPES = 5; //this should be 1 more than the highest terrain type
+const char terrain_chars[] = {'.','T','.','#','+'};
+const int terrain_colours[] = {COLOR_GREEN,COLOR_GREEN,COLOR_WHITE,COLOR_WHITE,COLOR_WHITE};
+const char* terrain_descriptors[] = {"soil", "a tree", "a paved floor", "a wall","a door"};
 
 const int WAVELENGTHS = 5;
 int map_terrain[MAP_SIZE][MAP_SIZE];
@@ -44,6 +49,7 @@ int rm_devices[WAVELENGTHS];
 float map_human_scent[MAP_SIZE][MAP_SIZE];
 float spare_scent_map[MAP_SIZE][MAP_SIZE];
 bool map_seen[MAP_SIZE][MAP_SIZE];
+bool map_access[MAP_SIZE][MAP_SIZE];
 
 //device states. represent native life with -species code.
 const int NULL_STIMULUS = 0;
@@ -67,12 +73,19 @@ const int viewport_width = 50;
 int centre_x = 0;
 int centre_y = 0;
 const int vis_range = 8;
+const int psychic_1_range = 6;
+const int psychic_0_range = 40;
 const int PISTOL = 0;
 const int RIFLE = 1;
 const int CANNON = 2;
 const int WEAPONS = 3;
 int ammo[WEAPONS];
 int current_weapon = PISTOL;
+
+const int BUILDING_SIZE = 17;
+int target_x;
+int target_y;
+
 
 const pair<int,int> directions[] = { make_pair(1,0), make_pair(1,1), make_pair(0,1), make_pair(-1,1),
 									 make_pair(-1,0), make_pair(-1,-1), make_pair(0,-1), make_pair(1,-1)};
@@ -96,6 +109,9 @@ struct species
 	bool sees, smells, hears, psychic;
 	char ch;
 	int colour;
+	float move_noise[TERRAIN_TYPES];
+	float still_noise;
+	float melee_noise;
 	string syl1, syl2, name;
 	string description;
 };
@@ -240,6 +256,7 @@ struct actor
 	bool dead;
 	int x, y;
 	int ai_x, ai_y;
+	float noise_this_turn;
 };
 
 actor* p_ptr = NULL;
@@ -325,10 +342,126 @@ int add_message(string msg)
 	rlmessages.push_back(msg);
 	return 0;
 }
+inline bool is_corner_a(int x,int y,int xsize,int ysize)
+{
+	return (x==0 || x == xsize) && (y==0 || y==ysize);
+}
+inline bool is_corner_b(int x,int y)
+{
+	bool n = (map_terrain[x][y-1] != WALL);
+	bool s = (map_terrain[x][y+1] != WALL);
+	bool e = (map_terrain[x+1][y] != WALL);
+	bool w = (map_terrain[x-1][y] != WALL);
+	if (n || s) return (e || w);
+	return false;
+}
+
+void make_room(pair<int,int> centre, pair<int,int> size)
+{
+	int x=centre.first;int y=centre.second;int xsize=size.first;int ysize=size.second;
+	vector<pair<int,int>> inner_walls;
+	vector<pair<int,int>> outer_walls;
+	for(int i=0;i<xsize+2;i++)
+	{
+		for(int j=0;j<ysize+2;j++)
+		{
+			if(i==0 || i == xsize+1 || j==0 || j==ysize+1)
+			{
+				if (map_terrain[i+x-xsize/2][j+y-ysize/2] == DIRT || map_terrain[i+x-xsize/2][j+y-ysize/2] == TREE)
+				{
+					map_terrain[i+x-xsize/2][j+y-ysize/2] = WALL;
+					if(!is_corner_a(i,j,xsize+1,ysize+1))
+					{ outer_walls.push_back(make_pair(i+x-xsize/2,j+y-ysize/2)); }
+				}
+			}
+			else
+			{
+				if(map_terrain[i+x-xsize/2][j+y-ysize/2] != WALL && map_terrain[i+x-xsize/2][j+y-ysize/2] != DOOR)
+				{
+					map_terrain[i+x-xsize/2][j+y-ysize/2] = FLOOR;
+				}
+				else if(!is_corner_b(i+x-xsize/2,j+y-ysize/2))
+				{
+					inner_walls.push_back(make_pair(i+x-xsize/2,j+y-ysize/2));
+				}
+			}
+		}
+	}
+	if(inner_walls.size()>0)
+	{
+		pair<int,int> inner_door_choice = inner_walls[rand()%inner_walls.size()];
+		map_access[inner_door_choice.first+1][inner_door_choice.second] = true;
+		map_access[inner_door_choice.first-1][inner_door_choice.second] = true;
+		map_access[inner_door_choice.first][inner_door_choice.second+1] = true;
+		map_access[inner_door_choice.first][inner_door_choice.second-1] = true;
+		map_terrain[inner_door_choice.first][inner_door_choice.second] = DOOR;
+	}
+	pair<int,int> outer_door_choice = outer_walls[rand()%outer_walls.size()];
+	map_terrain[outer_door_choice.first][outer_door_choice.second] = DOOR;
+	map_access[outer_door_choice.first+1][outer_door_choice.second] = true;
+	map_access[outer_door_choice.first-1][outer_door_choice.second] = true;
+	map_access[outer_door_choice.first][outer_door_choice.second+1] = true;
+	map_access[outer_door_choice.first][outer_door_choice.second-1] = true;
+
+}
+
+pair<int,int> can_make_room(pair<int,int> xy,int xcentre,int ycentre)
+{
+	int x=xy.first; int y = xy.second;
+	int xsize = rand()%5 + 3;
+	int ysize = rand()%5 + 3;
+	int inner_walls=0;
+	int outer_walls=0;
+	int floors=0;
+
+	for(int i=0;i<xsize+2;i++)
+	{
+		for(int j=0;j<ysize+2;j++)
+		{
+			if (!on_map(i+x-xsize/2,j+y-ysize/2)) {return make_pair(0,0);}
+			if (i+x-xsize/2 > xcentre+BUILDING_SIZE || i+x-xsize/2 < xcentre - BUILDING_SIZE) {return make_pair(0,0);}
+			if (j+y-ysize/2 > ycentre+BUILDING_SIZE || j+y-ysize/2 < ycentre - BUILDING_SIZE) {return make_pair(0,0);}
+			if(map_access[i+x-xsize/2][j+y-ysize/2]) {return make_pair(0,0);}
+			if(i==0 || i == xsize+1 || j==0 || j==ysize+1)
+			{
+				if (map_terrain[i+x-xsize/2][j+y-ysize/2] == DIRT || map_terrain[i+x-xsize/2][j+y-ysize/2] == TREE)
+				{
+					if(!is_corner_a(i,j,xsize+1,ysize+1))
+					{ outer_walls++; }
+				}
+			}
+			else
+			{
+				if(map_terrain[i+x-xsize/2][j+y-ysize/2] != WALL && map_terrain[i+x-xsize/2][j+y-ysize/2] != DOOR)
+				{
+					floors++;
+				}
+				else if(!is_corner_b(i+x-xsize/2,j+y-ysize/2))
+				{
+					inner_walls++;
+				}
+			}
+		}
+	}
+	if(inner_walls>0 && outer_walls > 0 && floors > 3)
+	{
+		return make_pair(xsize,ysize);
+	}
+	return make_pair(0,0);
+}
+
+pair<int,int> five_tries_to_make_room(pair<int,int> xy, int xcentre, int ycentre)
+{
+	for(int i=0;i<5;i++)
+	{
+		pair<int,int> ret = can_make_room(xy,xcentre, ycentre);
+		if(ret != make_pair(0,0)) return ret;
+	}
+	return make_pair(0,0);
+}
 
 void init_map()
 {
-	
 	for(int x=0;x<MAP_SIZE; x++)
 	{
 		for(int y=0;y<MAP_SIZE; y++)
@@ -336,14 +469,104 @@ void init_map()
 			map_occupants[x][y] = NULL;
 			map_items[x][y] = NULL;
 			map_seen[x][y] = false;
+			map_access[x][y] = false;
 			map_human_scent[x][y] = 0.0;
 			if(x != 0 && x != MAP_SIZE-1 && y != 0 && y != MAP_SIZE-1)
-				map_terrain[x][y] = rand() % TERRAIN_TYPES;
+				map_terrain[x][y] = rand() % 2;
 			else
 				map_terrain[x][y] = WALL;
 			//TODO make interesting map
 		}
 	}
+	int buildings = (rand()%3)+5;
+	int *building_xcentres = (int*)malloc(buildings*sizeof(int));
+	int *building_ycentres = (int*)malloc(buildings*sizeof(int));
+	for (int i=0;i<buildings;i++)
+	{
+		building_xcentres[i] = -BUILDING_SIZE;
+		building_ycentres[i] = -BUILDING_SIZE;
+	}
+	for(int i=0;i<buildings;i++)
+	{
+		bool is_ok = false;
+		int xcentre = rand()%(MAP_SIZE-2*BUILDING_SIZE)+BUILDING_SIZE;
+		int ycentre = rand()%(MAP_SIZE-2*BUILDING_SIZE)+BUILDING_SIZE;
+		while(!is_ok)
+		{
+			int xcentre = rand()%(MAP_SIZE-2*BUILDING_SIZE)+BUILDING_SIZE;
+			int ycentre = rand()%(MAP_SIZE-2*BUILDING_SIZE)+BUILDING_SIZE;
+			is_ok = true;
+			for(int j=0;j<i;j++)
+			{
+				if(abs(xcentre-building_xcentres[j])<=2*BUILDING_SIZE+3)
+				{
+					is_ok = false;
+					xcentre = rand()%(MAP_SIZE-2*BUILDING_SIZE-2)+BUILDING_SIZE;
+					ycentre = rand()%(MAP_SIZE-2*BUILDING_SIZE-2)+BUILDING_SIZE;
+				}
+			}
+		}
+		vector<pair<int,int>> room_centres;
+		room_centres.push_back(make_pair(xcentre,ycentre));
+		vector<pair<int,int>> room_sizes;
+		room_sizes.push_back(make_pair(rand()%5 + 2,rand()%5+2));
+		vector<int> fail_counts;
+		fail_counts.push_back(0);
+		make_room(room_centres[0],room_sizes[0]);
+		int successive_failures = 0;
+		int room_count = 0;
+		while(successive_failures < 10 && room_count < 10)
+		{
+			int x_size = rand()%5 + 3;
+			int y_size = rand()%5 + 3;
+			int parent_choice = rand()%room_centres.size();
+			pair<int,int> parent_centre = room_centres[parent_choice];
+			pair<int,int> parent_size = room_sizes[parent_choice];
+			vector<pair<int,int>> centre_choices;
+			vector<pair<int,int>> size_choices;
+			int choice_range_x = rand()%(x_size-2)+parent_size.first+2;
+			int choice_range_y = rand()%(y_size-2)+parent_size.second+2;
+			pair<int,int> candidate;
+			pair<int,int> candidate_size;
+			for(int x=0;x<choice_range_x;x++)
+			{
+				candidate=make_pair(x+parent_centre.first-choice_range_x/2,parent_centre.second-choice_range_y/2);
+				candidate_size = five_tries_to_make_room(candidate,xcentre,ycentre);
+				if(candidate_size != make_pair(0,0)) {centre_choices.push_back(candidate); size_choices.push_back(candidate_size);}
+
+				candidate=make_pair(x+parent_centre.first-choice_range_x/2,choice_range_y-1+parent_centre.second-choice_range_y/2);
+				candidate_size = five_tries_to_make_room(candidate,xcentre,ycentre);
+				if(candidate_size != make_pair(0,0)) {centre_choices.push_back(candidate); size_choices.push_back(candidate_size);}
+			}
+			for(int y=1;y<choice_range_y;y++)
+			{
+				candidate = make_pair(parent_centre.first-choice_range_x/2,y+parent_centre.second-choice_range_y/2);
+				candidate_size = five_tries_to_make_room(candidate,xcentre,ycentre);
+				if(candidate_size != make_pair(0,0)) {centre_choices.push_back(candidate); size_choices.push_back(candidate_size);}
+
+				candidate=make_pair(parent_centre.first-choice_range_x/2+choice_range_x-1,y+parent_centre.second-choice_range_y/2);
+				candidate_size = five_tries_to_make_room(candidate,xcentre,ycentre);
+				if(candidate_size != make_pair(0,0)) {centre_choices.push_back(candidate); size_choices.push_back(candidate_size);}
+			}
+			if(centre_choices.size() == 0)
+			{
+				successive_failures++;
+			}
+			else
+			{
+				successive_failures = 0;
+				int choice = rand()%centre_choices.size();
+				make_room(centre_choices[choice],size_choices[choice]);
+				room_centres.push_back(centre_choices[choice]);
+				room_sizes.push_back(size_choices[choice]);
+				fail_counts.push_back(0);
+				room_count++;
+			}
+			
+		}
+	}
+
+	free(building_xcentres); free(building_ycentres);
 }
 
 void init_actors()
@@ -392,6 +615,12 @@ void init()
 	init_map();
 	init_actors();
 	init_items();
+	target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
+	while(map_terrain[target_x][target_y] != FLOOR)
+	{
+		target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
+	}
+	add_junk("radio transmitter","So this is what's been causing you so much trouble!",'?',COLOR_BLUE,target_x,target_y);
 }
 
 inline void draw_ch(int x,int y,char ch, int col)
@@ -813,10 +1042,15 @@ void ai_turn(actor* a)
 	}
 	bool uncertain = true;
 
-	if(a->sspecies->psychic && randfloat() < (float)2*vis_range/d22(a->x,a->y,p_ptr->x,p_ptr->y))
+	if(a->sspecies->psychic)
 	{
-		a->ai_x = p_ptr->x; a->ai_y = p_ptr->y;
-		uncertain = false;
+		float d2 = sqrt((float)d22(a->x,a->y,p_ptr->x,p_ptr->y));
+		if(d2<=psychic_0_range && randfloat() < 1 + (psychic_1_range - d2)*(psychic_1_range - d2) /
+			((psychic_0_range - psychic_1_range)*(psychic_0_range - psychic_1_range)))
+		{
+			a->ai_x = p_ptr->x; a->ai_y = p_ptr->y;
+			uncertain = false;
+		}
 	}
 	if(uncertain && a->sspecies->sees && los_exists(a->x,a->y,p_ptr->x,p_ptr->y))
 	{
@@ -880,6 +1114,21 @@ void update_map_seen()
 	}
 }
 
+string signal_strength(int x,int y)
+{
+	int d2 = d22(x,y,target_x,target_y);
+	if((float)sqrt((float)d2) < 9+rand()%3)
+		return "coming from very close by!";
+	else if ((float)sqrt((float)d2) < 18 + rand()%6)
+		return "very strong!";
+	else if ((float)sqrt((float)d2) < 36 + rand()%12)
+		return "quite strong.";
+	else if ((float)sqrt((float)d2) < 72 + rand()%24)
+		return "quite weak.";
+	else
+		return "very weak...";
+}
+
 void player_turn(actor* a)
 {
 	update_map_seen();
@@ -914,6 +1163,8 @@ void player_turn(actor* a)
 			turn = 0; add_message("You wield your automatic rifle!"); current_weapon = RIFLE; break;
 		case 'Z':
 			turn = 0; add_message("You get out the plasma cannon!!"); current_weapon = CANNON; break;
+		case 'r':
+			add_message("The radio signal is "+signal_strength(p_ptr->x,p_ptr->y)); draw_last_msg(); break;
 		case 'f':
 			{
 				bool fire_mode = true;
