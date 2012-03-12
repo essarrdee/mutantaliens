@@ -327,6 +327,8 @@ actor* add_actor(species* sp, bool p, int xx, int yy)
 	a->dead = false;
 	a->x = xx;
 	a->y = yy;
+	a->ai_x = xx;
+	a->ai_y = yy;
 	actors.push_back(a);
 	map_occupants[xx][yy] = a;
 	a->health = (sp->health_range? rand()%(sp->health_range):0)+sp->min_health;
@@ -703,10 +705,10 @@ bool los_exists(int x1, int y1, int x2, int y2)
  
             x1 += ix;
             error += delta_y;
-			if (true)//(x1 != x2 && y1 != y2)
+			if (x1 != x2)//(x1 != x2 && y1 != y2)
 			{
 				if(debug)
-				{draw_ch(x1,y1,'&',COLOR_WHITE); getch();draw_tile_debug(x1,y1);}
+				;//{draw_ch(x1,y1,'&',COLOR_WHITE); getch();draw_tile_debug(x1,y1);}
 				if (is_opaque(x1, y1)) return false;
 			}
         }
@@ -732,13 +734,18 @@ bool los_exists(int x1, int y1, int x2, int y2)
             y1 += iy;
             error += delta_x;
  
-            if (true)//(x1 != x2 && y1 != y2)
+            if (y1 != y2)//(x1 != x2 && y1 != y2)
 			{
-				if (is_wall(x1, y1)) return false;
+				if (is_opaque(x1, y1)) return false;
 			}
         }
     }
 	return true;
+}
+
+bool symmetrical_los(int x1, int y1, int x2, int y2)
+{
+	return (los_exists(x1, y1, x2, y2) || los_exists(x2, y2, x1, y1));
 }
 
 void undraw_tile_description()
@@ -765,7 +772,7 @@ void draw_tile_description(int x, int y)
 		}
 		if (map_occupants[x][y] != NULL)
 		{
-			if(los_exists(p_ptr->x,p_ptr->y,x,y) || los_exists(x,y,p_ptr->x,p_ptr->y))
+			if(symmetrical_los(p_ptr->x,p_ptr->y,x,y))
 			{
 				attron(COLOR_PAIR(map_occupants[x][y]->sspecies->colour));
 				mvaddstr(2,viewport_width,map_occupants[x][y]->sspecies->name.c_str());
@@ -780,6 +787,8 @@ void draw_tile(int x, int y)
 	int colour = terrain_colours[map_terrain[x][y]];
 	if (!map_seen[x][y])
 	{draw_ch(x,y,' ',colour); return;}
+	if(debug && !symmetrical_los(p_ptr->x,p_ptr->y,x,y))
+	{draw_ch(x,y,' ',colour); return;}
 	if (map_items[x][y] != NULL)
 	{
 		ch = map_items[x][y]->ch;
@@ -787,7 +796,7 @@ void draw_tile(int x, int y)
 	}
 	if (map_occupants[x][y] != NULL)
 	{
-		if(los_exists(p_ptr->x,p_ptr->y,x,y) || los_exists(x,y,p_ptr->x,p_ptr->y))
+		if(symmetrical_los(p_ptr->x,p_ptr->y,x,y))
 		{
 			ch = map_occupants[x][y]->sspecies->ch;
 			colour = map_occupants[x][y]->sspecies->colour;
@@ -806,6 +815,7 @@ void draw_line(int x1, int y1, int x2, int y2, char ch)
     int delta_y(y2 - y1);
     signed char iy((delta_y > 0) - (delta_y < 0));
     delta_y = std::abs(delta_y) << 1;
+	int col = COLOR_BLUE;
  
     if (delta_x >= delta_y)
     {
@@ -827,7 +837,8 @@ void draw_line(int x1, int y1, int x2, int y2, char ch)
  
             x1 += ix;
             error += delta_y;
-			draw_ch(x1,y1,ch,1);
+			if (is_opaque(x1,y1)) {col = COLOR_RED;}
+			draw_ch(x1,y1,ch,col);
         }
     }
     else
@@ -850,7 +861,8 @@ void draw_line(int x1, int y1, int x2, int y2, char ch)
  
             y1 += iy;
             error += delta_x;
-			draw_ch(x1,y1,ch,1);
+			if (is_opaque(x1,y1)) {col = COLOR_RED;}
+			draw_ch(x1,y1,ch,col);
         }
     }
 	move(y2,x2-1);
@@ -1092,7 +1104,7 @@ void ai_turn(actor* a)
 			uncertain = false;
 		}
 	}
-	if(uncertain && a->sspecies->sees && los_exists(a->x,a->y,p_ptr->x,p_ptr->y))
+	if(uncertain && a->sspecies->sees && symmetrical_los(a->x,a->y,p_ptr->x,p_ptr->y))
 	{
 		a->ai_x = p_ptr->x; a->ai_y = p_ptr->y;
 		uncertain = false;
@@ -1146,7 +1158,7 @@ void update_map_seen()
 				{
 					if (!map_seen[x][y])
 					{
-						map_seen[x][y] = los_exists(x,y,px,py) || los_exists(px,py,x,y);
+						map_seen[x][y] = symmetrical_los(x,y,px,py);
 					}
 				}
 			}
@@ -1207,10 +1219,53 @@ void player_turn(actor* a)
 			turn = 0; add_message("The radio signal is "+signal_strength(p_ptr->x,p_ptr->y)); draw_last_msg(); break;
 		case 'd':
 			debug = !debug; break;
-		case 'f':
+		case 't':
 			{
-				bool fire_mode = true;
+				bool throw_mode = true;
 				int lx = p_ptr->x; int ly = p_ptr->y;
+			while(throw_mode)
+			{
+				draw_tile_description(lx,ly);
+				draw_line(p_ptr->x,p_ptr->y,lx,ly,'*');
+				int kpp = getch();
+				undraw_line(p_ptr->x,p_ptr->y,lx,ly);
+				undraw_tile_description();
+				switch(kpp)
+				{
+				case KEY_UP: case 'k':
+					ly = max(ly-1,viewport_top_edge()); break;
+				case KEY_DOWN: case 'j':
+					ly = min(ly+1,viewport_bottom_edge()); break;
+				case KEY_LEFT: case 'h':
+					lx = max(lx-1,viewport_left_edge()); break;
+				case KEY_RIGHT: case 'l':
+					lx = min(lx+1,viewport_right_edge()); break;
+				case 'y':
+					lx = max(lx-1,viewport_left_edge()); ly = max(ly-1,viewport_top_edge()); break;
+				case 'u':
+					lx = min(lx+1,viewport_right_edge()); ly = max(ly-1,viewport_top_edge()); break;
+				case 'b':
+					lx = max(lx-1,viewport_left_edge()); ly = min(ly+1,viewport_bottom_edge()); break;
+				case 'n':
+					lx = min(lx+1,viewport_right_edge()); ly = min(ly+1,viewport_bottom_edge()); break;
+				case 't':
+					{
+
+					}
+					break;
+				case KEY_ESC:
+					 throw_mode = false; break;
+				case 'i':
+					draw_info(lx,ly); getch(); draw(); break;
+				default: ;
+				}
+			}
+			}
+			break;
+		case 'f':
+		{
+			bool fire_mode = true;
+			int lx = p_ptr->x; int ly = p_ptr->y;
 			while (fire_mode)
 			{
 				draw_tile_description(lx,ly);
@@ -1255,7 +1310,8 @@ void player_turn(actor* a)
 			}
 			undraw_line(p_ptr->x,p_ptr->y,lx,ly);
 			undraw_tile_description();
-			}
+		}
+		break;
 			
 		default: ;
 		}
@@ -1318,6 +1374,7 @@ int main()
 {
 	srand((unsigned int)time(NULL));
 	init();
+	ESCDELAY=0;
 	int end_game = 0;
 	while(!end_game)
 	{
