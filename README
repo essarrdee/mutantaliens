@@ -1,7 +1,7 @@
 to run, type:
         make
         ./mutantaliens
-hjklyubn to move. arrow keys work for diagonal movement. keypad not yet implemented.
+hjklyubn to move. arrow keys work for orthogonal movement. keypad not yet implemented.
 r to check radio signal strength.
 f to enter fire mode, hjklyubn or arrow keys to target, f to fire, i to inspect targeted square.
 d to enter debug mode. not half as fun as the average debug mode.
