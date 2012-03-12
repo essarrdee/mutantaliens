@@ -1198,11 +1198,11 @@ void player_turn(actor* a)
 		case '.':
 			turn = 0; break;
 		case 'X':
-			if(current_weapon == PISTOL) {turn = 0; add_message("You wield your pistol."); current_weapon = PISTOL;} break;
+			if(current_weapon != PISTOL) {turn = 0; add_message("You wield your pistol."); current_weapon = PISTOL;} break;
 		case 'Y':
-			if(current_weapon == RIFLE) {turn = 0; add_message("You wield your automatic rifle!"); current_weapon = RIFLE;} break;
+			if(current_weapon != RIFLE) {turn = 0; add_message("You wield your automatic rifle!"); current_weapon = RIFLE;} break;
 		case 'Z':
-			if(current_weapon == CANNON) {turn = 0; add_message("You get out the plasma cannon!!"); current_weapon = CANNON;} break;
+			if(current_weapon != CANNON) {turn = 0; add_message("You get out the plasma cannon!!"); current_weapon = CANNON;} break;
 		case 'r':
 			turn = 0; add_message("The radio signal is "+signal_strength(p_ptr->x,p_ptr->y)); draw_last_msg(); break;
 		case 'd':
