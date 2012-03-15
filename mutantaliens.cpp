@@ -796,6 +796,8 @@ bool win_condition()
 		}
 		else return false;
 	}
+	if(map_occupants[ship_x+2][ship_y] != NULL)
+	{return false;}
 	return player_present;
 }
 
@@ -2308,13 +2310,14 @@ int play_turn()
 				{
 					if(act->energy > 100)
 					{
-						act->energy -= 100;
-						player_turn(act);
 						if(win_condition())
 						{
 							win();
 							
 						}
+						act->energy -= 100;
+						player_turn(act);
+						
 						visible_actors.clear();
 					}
 					if(!debug && !(turn_count %5))
