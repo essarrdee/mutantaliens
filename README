@@ -1,8 +1,15 @@
 to run, type:
         make
         ./mutantaliens
-hjklyubn to move. arrow keys work for orthogonal movement. keypad not yet implemented.
+commands which currently have a useful effect:
+hjklyubn to move. arrow keys work for orthogonal movement. number keys work, but keypad numbers are not guaranteed to work. contact me if they don't, and you know how to make them work.
 r to check radio signal strength.
-f to enter fire mode, hjklyubn or arrow keys to target, f to fire, i to inspect targeted square.
-d to enter debug mode. not half as fun as the average debug mode.
-X,Y,Z to wield pistol, rifle, plasma cannon.
+f to enter fire mode, hjklyubn or arrow keys to target, f to fire, i to inspect targeted square, tab to target a visible monster. will also tell you the x,y position on the 150x150 map.
+t to enter throwing mode, abcdef to select device (only a and b, the explosives, currently do anything),
+                          then a (this will change in later versions, when you can carry devices on remote control/timer),
+                          then b if you want it to do anything (this will change when remote control is usable),
+						  then 0 to 9 to select timer length.
+X,Y,Z to wield pistol, rifle, or plasma cannon.
+
+Try to use your radio to find the radio transmitter, destroy it with some explosives, and get back into the ship, without getting killed.
+bug reports/comments to (quendus at google's email domain)
