@@ -1847,7 +1847,7 @@ item* select_individual_device_from_type_and_config(int type, int config)
 	attron(COLOR_PAIR(COLOR_WHITE));
 	for(unsigned int i=0;i<options->size();i++)
 	{
-		mvprintw(i,0,"(%c) %s with %d seconds remaining",'a'+i, (*options)[i]->name, (*options)[i]->time_remaining);
+		mvprintw(i,0,"(%c) %s with %d seconds remaining",'a'+i, (*options)[i]->name.c_str(), (*options)[i]->time_remaining);
 	}
 
 	int kp = fgetch();
@@ -1893,7 +1893,7 @@ int ask_for_wavelength()
 		}
 		else
 		{
-			mvprintw(i+3,0,"(%d) %s", a->name);
+			mvprintw(i+3,0,"(%d) %s", a->name.c_str());
 		}
 	}
 	int w = -2;
