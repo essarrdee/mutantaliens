@@ -2093,21 +2093,21 @@ void player_turn(actor* a)
 		int kp = fgetch();
 		switch(kp)
 		{
-		case KEY_UP: case 'k': case PAD0+8: case '8':
+		case KEY_UP: case 'k': case '8':
 			turn = move_actor(a,0,-1); break;
-		case KEY_DOWN: case 'j': case PAD0+2: case '2':
+		case KEY_DOWN: case 'j':case '2':
 			turn = move_actor(a,0,1); break;
-		case KEY_LEFT: case 'h': case PAD0+4: case '4':
+		case KEY_LEFT: case 'h': case '4':
 			turn = move_actor(a,-1,0); break;
-		case KEY_RIGHT: case 'l': case PAD0+6: case '6':
+		case KEY_RIGHT: case 'l': case '6':
 			turn = move_actor(a,1,0); break;
-		case 'y':case PAD0+7: case '7':
+		case 'y':case '7':
 			turn = move_actor(a,-1,-1); break;
-		case 'u':case PAD0+9: case '9':
+		case 'u':case '9':
 			turn = move_actor(a,1,-1); break;
-		case 'b':case PAD0+1: case '1':
+		case 'b':case '1':
 			turn = move_actor(a,-1,1); break;
-		case 'n':case PAD0+3: case '3':
+		case 'n':case '3':
 			turn = move_actor(a,1,1); break;
 		case '.':
 			turn = 0; break;
