@@ -4,12 +4,22 @@ to run, type:
 commands which currently have a useful effect:
 hjklyubn to move. arrow keys work for orthogonal movement. number keys work, but keypad numbers are not guaranteed to work. contact me if they don't, and you know how to make them work.
 r to check radio signal strength.
-f to enter fire mode, hjklyubn or arrow keys to target, f to fire, i to inspect targeted square, tab to target a visible monster. will also tell you the x,y position on the 150x150 map.
-t to enter throwing mode, abcdef to select device (only a and b, the explosives, currently do anything),
-                          then a (this will change in later versions, when you can carry devices on remote control/timer),
-                          then b if you want it to do anything (this will change when remote control is usable),
-						  then 0 to 9 to select timer length.
-X,Y,Z to wield pistol, rifle, or plasma cannon.
+R to start or stop running. As your stamina(**********) decreases, your running speed decreases to your walking speed.
+f to enter fire mode, hjklyubn or arrow keys to target, f to fire, i to inspect targeted square, tab autotarget visible monsters.
+t to enter throwing mode, abcdef to select device (only a, b, and e currently do anything),
+	then a (this will change in later versions, when you can carry devices on remote control/timer),
+	then b if you want it to do anything (this will change when remote control is usable),
+	then 0 to 9 to select timer length.
+	so, the only useful throwing commands at the moment are aab(0-9), bab(0-9), and eab(0-9). This will improve later.
+	high explosives have range 4, low explosives have range 2. don't hurt yourself!
 
-Try to use your radio to find the radio transmitter, destroy it with some explosives, and get back into the ship, without getting killed.
+X,Y,Z to wield pistol, rifle, or plasma cannon. Their power is in that order.
+which one you are wielding is indicated by a line above the weapon in use.
+the memory display currently displays all information about alien species. In future it will only display known information.
+memory shows monster symbol, monster size, monster walk speed (relative to your walk), monster max run speed (relative to your max run speed), monster damage (absolute), and monster health (absolute).
+the monster health descriptions are not very helpful at the moment - monsters marked frail will die to at most 3 rifle bursts, monsters marked touch will take anywhere up to 10.
+counts of items in your inventory, and loudest sound heard this turn are also displayed. The direction the sound came from will sometimes disagree with what you see - thats because you can't hear very well.
+You will also tend to be deaf for quite a long time after using explosives.
+
+Try to use your radio to find the radio transmitter, destroy it by throwing explosives, and get back into the ship, without getting killed.
 bug reports/comments to (quendus at google's email domain)

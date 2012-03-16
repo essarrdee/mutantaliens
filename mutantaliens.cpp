@@ -6,10 +6,29 @@
 #include <algorithm>
 #include <string>
 #include <math.h>
+#include <array>
 
 #pragma warning(disable: 4996)
+/*
+REAL TODO
+make aliens react to noise, make noise generators, make deafness, make noises happen
+make graduated sensitivity to smell, make alternatives for smell generator, 
+make brain slice
+make hologram, make blinding lights
+make remotes
+allow pickup, drop, hide, activate
+hide monster memory
+
+
+*/
+const float PI = 3.14159265f;
 
 /* TODO
+start with small aliens, or mention in tutorial.
+
+prevent shooting, throwing onto wall tiles?
+allow transparent passable things?
+
 make devices have an effect
 make devices activateable, hideable, droppable, pickupable, remotable
 make guns structs
@@ -19,7 +38,6 @@ make pack monsters try to maintain distance from player while a group assembles,
 make detailed species descriptions
 make monster memory
 make buildings multilevel
-make the plot stuff
 */
 
 #define arrayend(ar)  ar + (sizeof(ar) / sizeof(ar[0]))
@@ -27,6 +45,8 @@ make the plot stuff
 inline int squarei(int x) {return x*x;}
 inline float squaref(float x) {return x*x;}
 using namespace std;
+
+WINDOW* scratch;
 
 const int KEY_ESC = 27;
 bool transmitter_destroyed = false;
@@ -41,7 +61,7 @@ const int DOOR = 5;
 const int SW_NE = 6;
 const int NW_SE = 7;
 const int NOSE = 8;
-const int PANEL = 9;
+const int CPANEL = 9;
 const int NS = 10;
 const int WE = 11;
 const int TERRAIN_TYPES = 12; //this should be 1 more than the highest terrain type
@@ -50,8 +70,16 @@ const int terrain_colours[] = {COLOR_GREEN,COLOR_GREEN,COLOR_GREEN,COLOR_WHITE,C
 COLOR_WHITE,COLOR_WHITE,COLOR_WHITE,COLOR_WHITE,COLOR_WHITE,COLOR_WHITE};
 const char* terrain_descriptors[] = {"soil", "a small tree", "a big tree", "a paved floor", "a wall","a door","ship hull"
 "ship hull","ship hull","control panel","ship hull","ship hull"};
+const char* mode_text[] = {"walk mode", "fire mode", "throw mode", "info mode"};
+const char* size_descriptors[] = {"smal", "medm", "huge"};
+const char* damage_descriptors[] = {"weak","strg"};
 bool debug = false;
 int turn_count = 0;
+const int WALK_MODE = 0;
+const int FIRE_MODE = 1;
+const int THROW_MODE = 2;
+const int INFO_MODE = 3;
+int current_mode = 0;
 
 const int WAVELENGTHS = 5;
 int map_terrain[MAP_SIZE][MAP_SIZE];
@@ -80,6 +108,9 @@ const int ON_TIMER = 1;
 const int ON_REMOTE = 2;
 const int DEVICE_CONFIGURATIONS = 3;
 const int MAX_IDENTICAL_DEVICES = 10;
+
+const int ZOO_SIZE = 7;
+
 const char* const config_names[] = {"unconfigured", "on a timer", "remote controlled"};
 vector<string> vconfig_names(config_names,config_names+DEVICE_CONFIGURATIONS);
 template<class T> void kill_velement(vector<T>& vec, T elem)
@@ -103,7 +134,7 @@ const int RIFLE = 1;
 const int CANNON = 2;
 const int WEAPONS = 3;
 int ammo[WEAPONS];
-int current_weapon = PISTOL;
+int current_weapon = RIFLE;
 
 const int BUILDING_SIZE = 17;
 int target_x;
@@ -147,30 +178,63 @@ float randfloat()
 }
 
 vector<string> rlmessages;
+int last_message_seen=0;
 inline string padmsg(string msg)
 {
 	return msg + string(viewport_width-msg.length(),' ');
 }
-int add_message(string msg)
+void add_message(string msg)
 {
-	if(msg.length() > viewport_width) return 1;
+	//if(msg.length() > viewport_width) return 1;
 	rlmessages.push_back(msg);
-	return 0;
+	//return 0;
+}
+
+void draw_text_wodge(string s)
+{
+	int lines = (int)ceil(((float)s.length())/viewport_width);
+	attron(COLOR_PAIR(COLOR_WHITE));
+	mvaddstr(lines-1,0,string(viewport_width,' ').c_str());
+	for(int i=0;i<lines;i++)
+	{
+		mvaddstr(i,0,(s.substr(viewport_width*i,viewport_width).c_str()));
+	}
+	//getch();
 }
 
 void draw_last_msg()
 {
-	attron(COLOR_PAIR(COLOR_WHITE));
-	mvaddstr(0,0,padmsg(rlmessages.back()).c_str());
+	//attron(COLOR_PAIR(COLOR_WHITE));
+	string s = "";
+	for(unsigned int i = last_message_seen; i < rlmessages.size(); i++)
+	{
+		s += rlmessages[i]; s += " ";
+	}
+	draw_text_wodge(s);
+	last_message_seen = max(last_message_seen,(int)rlmessages.size()-2);
+	//mvaddstr(0,0,padmsg(rlmessages.back()).c_str());
 }
+
+struct noise
+{
+	float volume;
+	string describe;
+	bool scary;
+};
+noise LE_noise = {30.0,"explosion",true};
+noise HE_noise = {60.0,"big explosion",true};
+vector<vector<noise>> walk_noise(ZOO_SIZE+1,vector<noise>(TERRAIN_TYPES));
+vector<vector<noise>> run_noise(ZOO_SIZE+1,vector<noise>(TERRAIN_TYPES));
 
 struct species
 {
+	int id;
 	int min_health, health_range;
 	int damage;
 	int vis_range;
 	float smell_clarity;
-	float hearing;
+	float hearing_thres;
+	float hearing_adapt;
 	int psychic_range;
 	char ch;
 	int colour;
@@ -178,9 +242,8 @@ struct species
 	int run_energy;
 	int stamina;
 	int size;
-	float move_noise[TERRAIN_TYPES];
-	float still_noise;
-	float melee_noise;
+	noise still_noise;
+	noise melee_noise;
 	string syl1, syl2, name;
 	string description;
 };
@@ -202,8 +265,8 @@ inline int viewport_bottom_edge()
 	return centre_y+viewport_height/2;
 }
 
-const int ZOO_SIZE = 7;
 vector<species*> zoo;
+species* human_sp;
 
 const char* const clusters_1[] = {"b","c","d","f","g","h","j","k","l","m","n","p","r","s","t","v","w","x","y","z"};
 vector<string> vclusters_1(clusters_1,arrayend(clusters_1));
@@ -281,9 +344,11 @@ string random_syllable()
 void init_species()
 {
 	species* human = new species();
+	human->id = 0;
 	human->health_range = 0; human->min_health = 100;
 	human->ch = '@';
-	human->psychic_range=0; human->hearing = 1.0;
+	human->psychic_range=0; human->hearing_thres = 1.0f;
+	human->hearing_adapt = 0.3f;
 	human->smell_clarity = 0.1f; human->vis_range = 8;
 	human->syl1 = "hu"; human->syl2 = "man";
 	human->name = "human";
@@ -291,13 +356,25 @@ void init_species()
 	human->damage = 1;
 	human->walk_energy = 10;
 	human->run_energy = 21;
-	human->stamina = 200;
+	human->stamina = 1500;
 	human->size = 1;
-	human->description = "An legendary advanced alien race whose technology is built specifically for murder, ecological destruction, deception, and gentle shaking. Members of this species must be killed on immediately upon discovery to prevent catastrophic damage to the whole area.";
+	noise wn[TERRAIN_TYPES] = {{1.0,"footsteps",false},{1.5,"footsteps",false},{1.5f,"footsteps",false},{2.0,"footsteps",false},{0.0,"",false},
+	{2.3f,"footsteps",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false}};
+	walk_noise[0] = vector<noise>(wn,wn+TERRAIN_TYPES);
+	//delete [] wn;
+	noise rn[TERRAIN_TYPES] = {{2.0,"footsteps",false},{3.0,"footsteps",false},{3.5f,"footsteps",false},{3.0,"footsteps",false},{0.0,"",false},
+	{3.3f,"footsteps",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false}};
+	run_noise[0] = vector<noise>(rn,rn+TERRAIN_TYPES);
+	//delete [] rn;
+	
+	
+	human->description = "A legendary advanced alien race whose technology is built specifically for murder, ecological destruction, deception, and gentle shaking. Members of this species must be killed immediately upon discovery to prevent catastrophic damage to the whole area.";
 	zoo.push_back(human);
+	human_sp = human;
 	for (int spsp=0; spsp<ZOO_SIZE; spsp++)
 	{
 		species* alien = new species();
+		alien->id = spsp;
 		alien->syl1 = random_syllable();
 		alien->syl2 = random_syllable();
 		alien->name = alien->syl1+"-"+alien->syl2;
@@ -308,6 +385,13 @@ void init_species()
 			alien->colour = rand()%6+1;
 		}
 		int size = rand()%3;
+		if(spsp == ZOO_SIZE -1) size = 2;
+		else if(spsp==ZOO_SIZE - 2) size = 1;
+		else if(spsp==ZOO_SIZE-3) size = 0;
+		alien->size = size;
+		string walk_str;
+		string run_str;
+		float extra_noise;
 		switch(size)
 		{
 		case 0:
@@ -329,8 +413,15 @@ void init_species()
 				alien->vis_range = rand()%2+2; break;
 			}
 
-			if(rand()%7 < 5){alien->hearing = 3.0f;}
-			else {alien->hearing = 0.1f;}
+			if(rand()%7 < 2){
+				alien->hearing_thres = 1.0f+((float)(rand()%10))/3;
+				alien->hearing_adapt = 0.3f;
+			}
+			else
+			{
+				alien->hearing_thres = -4.0f+(float)(rand()%300)*0.01f;
+				alien->hearing_adapt = 1.5f;
+			}
 
 			switch(rand()%7)
 			{
@@ -344,7 +435,34 @@ void init_species()
 
 			alien->walk_energy = rand()%7+9;
 			alien->run_energy = (3*alien->walk_energy)/2 + rand()%3;
-			alien->stamina = (rand()%4+6)*alien->run_energy + rand()%(2*alien->run_energy);
+			alien->stamina = 5*((rand()%4+6)*alien->run_energy + rand()%(2*alien->run_energy));
+
+			switch(rand()%3)
+			{
+			case 0:
+				walk_str = "scuttling"; break;
+			case 1:
+				walk_str = "scampering"; break;
+			case 2:
+				walk_str = "pattering"; break;
+			}
+			switch(rand()%2)
+			{
+			case 0:
+				run_str = "scuttling"; break;
+			case 1:
+				run_str = "scampering"; break;
+			}
+			extra_noise = -4.0;
+			walk_noise[spsp] = vector<noise>(wn,wn+TERRAIN_TYPES);
+			run_noise[spsp] = vector<noise>(rn,rn+TERRAIN_TYPES);
+			for(int i=0;i<TERRAIN_TYPES;i++)
+			{
+				walk_noise[spsp][i].describe = walk_str;
+				walk_noise[spsp][i].volume +=extra_noise;
+				walk_noise[spsp][i].describe = run_str;
+				walk_noise[spsp][i].volume +=extra_noise;
+			}
 			break;
 		case 1:
 			alien->description = "A medium-sized alien.";
@@ -365,8 +483,16 @@ void init_species()
 				alien->vis_range = rand()%2+2; break;
 			}
 
-			if(rand()%7 < 3){alien->hearing = 3.0f;}
-			else {alien->hearing = 0.1f;}
+			if(rand()%7 < 3)
+			{
+				alien->hearing_thres = 2.0f+0.05f*(rand()%20);
+				alien->hearing_adapt = 0.25f;
+			}
+			else
+			{
+				alien->hearing_thres = -2.0f+0.1f*(rand()%10);
+				alien->hearing_adapt = 0.7f;
+			}
 
 			switch(rand()%7)
 			{
@@ -380,7 +506,35 @@ void init_species()
 
 			alien->walk_energy = rand()%4+8;
 			alien->run_energy = ((rand()%10+5)*alien->walk_energy)/5 + rand()%4;
-			alien->stamina = (rand()%5+7)*alien->run_energy + rand()%(2*alien->run_energy);
+			alien->stamina = 4*((rand()%5+7)*alien->run_energy + rand()%(2*alien->run_energy));
+						walk_noise[spsp] = vector<noise>(wn,wn+TERRAIN_TYPES);
+
+			switch(rand()%3)
+			{
+			case 0:
+				walk_str = "footsteps"; break;
+			case 1:
+				walk_str = "cantering"; break;
+			case 2:
+				walk_str = "trotting"; break;
+			}
+			switch(rand()%2)
+			{
+			case 0:
+				run_str = "galloping"; break;
+			case 2: 
+				run_str = "running"; break;
+			}
+			extra_noise = 0.0;
+			walk_noise[spsp] = vector<noise>(wn,wn+TERRAIN_TYPES);
+			run_noise[spsp] = vector<noise>(rn,rn+TERRAIN_TYPES);
+			for(int i=0;i<TERRAIN_TYPES;i++)
+			{
+				walk_noise[spsp][i].describe = walk_str;
+				walk_noise[spsp][i].volume +=extra_noise;
+				walk_noise[spsp][i].describe = run_str;
+				walk_noise[spsp][i].volume +=extra_noise;
+			}
 			break;
 		case 2:
 			alien->description = "A huge alien.";
@@ -401,8 +555,18 @@ void init_species()
 				alien->vis_range = rand()%2+2; break;
 			}
 
-			if(rand()%7 < 4){alien->hearing = 3.0f;}
-			else {alien->hearing = 0.1f;}
+			if(rand()%7 < 4)
+			{
+				alien->hearing_thres = 2.5f+0.1f*(rand()%15);
+				alien->hearing_adapt = 0.1f;
+
+			}
+			else
+			{
+				alien->hearing_thres = -5.0f+0.03f*(rand()%100);
+				alien->hearing_adapt = 1.0f;
+
+			}
 
 			switch(rand()%7)
 			{
@@ -416,7 +580,31 @@ void init_species()
 
 			alien->walk_energy = rand()%3+6;
 			alien->run_energy = alien->walk_energy + rand()%6;
-			alien->stamina = (rand()%4+5)*alien->run_energy + rand()%(2*alien->run_energy);
+			alien->stamina = 2*((rand()%4+5)*alien->run_energy + rand()%(2*alien->run_energy));
+			switch(rand()%3)
+			{
+			case 0:
+				walk_str = "thumping"; break;
+			case 1:
+				walk_str = "pounding"; break;
+			case 2:
+				walk_str = "crashing"; break;
+			}
+			switch(rand()%1)
+			{
+			case 0:
+				run_str = "charging"; break;
+			}
+			extra_noise = 4.0;
+			walk_noise[spsp] = vector<noise>(wn,wn+TERRAIN_TYPES);
+			run_noise[spsp] = vector<noise>(rn,rn+TERRAIN_TYPES);
+			for(int i=0;i<TERRAIN_TYPES;i++)
+			{
+				walk_noise[spsp][i].describe = walk_str;
+				walk_noise[spsp][i].volume +=extra_noise;
+				walk_noise[spsp][i].describe = run_str;
+				walk_noise[spsp][i].volume +=extra_noise;
+			}
 		}
 		/*char buf[1000] = "";
 		sprintf(buf,"A %s is a %s creature %s.",
@@ -433,6 +621,7 @@ struct actor
 {
 	species* sspecies;
 	bool is_player;
+	bool is_hologram;
 	int health;
 	int energy;
 	bool running;
@@ -440,7 +629,10 @@ struct actor
 	bool dead;
 	int x, y;
 	int ai_x, ai_y;
+	int runaway_x, runaway_y;
 	float noise_this_turn;
+	float sound_threshold;
+	float most_noticeable_sound;
 };
 actor* current_target = NULL;
 vector<actor*> visible_actors;
@@ -449,7 +641,7 @@ actor* map_occupants[MAP_SIZE][MAP_SIZE];
 bool terrain_immovable(actor* a, int x, int y)
 {
 	if (map_terrain[x][y] == WALL || map_terrain[x][y] == NW_SE|| map_terrain[x][y] == SW_NE
-		|| map_terrain[x][y] == NS || map_terrain[x][y] == WE || map_terrain[x][y] == NOSE || map_terrain[x][y] == PANEL) return true;
+		|| map_terrain[x][y] == NS || map_terrain[x][y] == WE || map_terrain[x][y] == NOSE || map_terrain[x][y] == CPANEL) return true;
 	if (map_occupants[x][y] != NULL && map_occupants[x][y] != a) return true;
 	return false;
 }
@@ -466,6 +658,7 @@ pair<int,int> random_occupiable_square()
 
 struct item
 {
+	actor* projection;
 	int colour;
 	char ch;
 	string name;
@@ -473,6 +666,7 @@ struct item
 	string base_description;
 	int device_type;
 	int wavelength;
+	int power_remaining;
 	int time_remaining;
 	int species_stored;
 	int current_action;
@@ -481,7 +675,6 @@ struct item
 	int x;
 	int y;
 	bool player_has;
-	bool already_exploded;
 };
 
 struct explosion
@@ -489,7 +682,8 @@ struct explosion
 	int x; int y; int radius; int centre_damage;
 };
 vector<explosion> explosions_this_turn;
-vector<item*> activate_this_turn;
+vector<item*> explode_this_turn;
+vector<item*> active_devices;
 item* rm_devices[WAVELENGTHS];
 vector<item*> timer_devices;
 vector<item*> next_timer_devices;
@@ -498,6 +692,91 @@ vector<actor*> actors;
 vector<item*> items;
 vector<item*> devices;
 vector<vector<vector<item*>>> dev_inv;//type,configuration,individual. Not joking.
+
+
+const float ideal_clarity = 2.0;
+string sound_this_turn = "";
+string dir_this_turn = "";
+void react_to_noise(actor* a,noise* n,int xx, int yy)
+{
+	if(a->is_player)
+	{
+		sound_this_turn = n->describe;
+		if(on_map(xx,yy))
+		{
+			int dx = xx-a->x; int dy = yy-a->y;
+			if(dx != 0)
+			{
+				float t = 180*atan(float(dy)/(float)dx)/PI;
+				if(t<-67.5)
+				{dir_this_turn = (dx>0?"South":"North");}
+				else if(t<-22.5)
+				{dir_this_turn = (dx>0?"SEast":"NWest");}
+				else if(t<22.5)
+				{dir_this_turn = (dx>0?"East":"West");}
+				else if(t<67.5)
+				{dir_this_turn = (dx>0?"NEast":"SWest");}
+				else {dir_this_turn = (dx>0?"North":"South");}
+			}
+			else
+			{
+				if(dy == 0)
+				{
+					dir_this_turn = "here";
+				}
+				else {dir_this_turn = (dy>0)?"South":"North";}
+			}
+		}
+		else{dir_this_turn = "???";}
+	}
+}
+
+void make_noise(int x,int y,noise* n)
+{
+for(vector<actor*>::iterator a = actors.begin(); a != actors.end(); ++a)
+{
+	if(!(*a)->dead && !(*a)->is_hologram)
+	{
+		int d2 = d22(x,y,(*a)->x,(*a)->y);
+		float rel_vol = n->volume - 2*log((float)d2+1);
+		float clarity = (rel_vol - (*a)->sound_threshold);
+		float clarity2 = abs(clarity-ideal_clarity);
+		if(clarity > 0)
+		{
+			(*a)->sound_threshold  = max((*a)->sound_threshold,rel_vol - ideal_clarity);
+		}
+		if((*a)->most_noticeable_sound < clarity)
+		{
+			int d = (int)ceil(sqrt((float)d2)/2);
+			int xx, yy;
+			(*a)->sound_threshold = rel_vol - ideal_clarity;
+			if(clarity2 <= ideal_clarity/4)
+			{
+				xx = x; yy = y;
+			}
+			else if(clarity2 <= ideal_clarity/2)
+			{
+				xx = x-d/2 + rand()%(d+1);
+				yy = y-d/2 + rand()%(d+1);
+			}
+			else if(clarity2 <= ideal_clarity)
+			{
+				xx = x-d + rand()%(2*d+1);
+				yy = y-d + rand()%(2*d+1);
+			}
+			else
+			{
+				xx=-500;
+				yy=-500;
+			}
+			react_to_noise(*a,n,xx,yy);
+		}
+
+		
+	}
+}
+}
+
 
 int count_inv_devices(int dev_type)
 {
@@ -578,6 +857,7 @@ void device_to_inventory(item* a)
 void add_junk(string name, string description, char ch, int colour, int x, int y)
 {
 	item* it = new item();
+	it->projection = NULL;
 	it->colour = colour;
 	it->ch = ch;
 	it->device_type = NOT_DEVICE;
@@ -590,9 +870,10 @@ void add_junk(string name, string description, char ch, int colour, int x, int y
 
 }
 
-actor* add_actor(species* sp, bool p, int xx, int yy)
+actor* add_actor(species* sp, bool p, int xx, int yy,bool hologram=false)
 {
 	actor* a = new actor();
+	a->is_hologram = hologram;
 	a->sspecies = sp;
 	a->is_player = p;
 	a->dead = false;
@@ -603,9 +884,13 @@ actor* add_actor(species* sp, bool p, int xx, int yy)
 	a->y = yy;
 	a->ai_x = xx;
 	a->ai_y = yy;
+	a->most_noticeable_sound = 0.0f;
+	a->runaway_x = -500;
+	a->runaway_y = -500;
 	actors.push_back(a);
 	map_occupants[xx][yy] = a;
 	a->health = (sp->health_range? rand()%(sp->health_range):0)+sp->min_health;
+	a->sound_threshold = a->sspecies->hearing_thres;
 	return a;
 }
 
@@ -735,15 +1020,15 @@ void draw_ship(int x,int y)
 	ship_x = x;
 	ship_y = y;
 	map_terrain[x-4][y] = NOSE;
-	map_terrain[x-3][y] = PANEL;
+	map_terrain[x-3][y] = CPANEL;
 	map_terrain[x-3][y-1] = SW_NE;
 	map_terrain[x-3][y+1] = NW_SE;
 	map_terrain[x-2][y-2] = SW_NE;
 	map_terrain[x-2][y+2] = NW_SE;
-	map_terrain[x-2][y-1] = PANEL;
+	map_terrain[x-2][y-1] = CPANEL;
 	map_terrain[x-2][y] = FLOOR;
 	map_terrain[x-2][y+2] = NW_SE;
-	map_terrain[x-2][y+1] = PANEL;
+	map_terrain[x-2][y+1] = CPANEL;
 	map_terrain[x-1][y-2] = WE;
 	map_terrain[x-1][y+2] = WE;
 	map_terrain[x][y-2] = WE;
@@ -971,7 +1256,7 @@ bool is_wall(int x, int y)
 bool is_opaque(int x, int y)
 {
 	return map_terrain[x][y] == WALL || map_terrain[x][y] == BTREE|| map_terrain[x][y] == NW_SE|| map_terrain[x][y] == SW_NE
-		|| map_terrain[x][y] == NS || map_terrain[x][y] == WE || map_terrain[x][y] == NOSE || map_terrain[x][y] == PANEL;
+		|| map_terrain[x][y] == NS || map_terrain[x][y] == WE || map_terrain[x][y] == NOSE || map_terrain[x][y] == CPANEL;
 }
 
 void update_device_desciption(item* dev)
@@ -993,6 +1278,7 @@ void update_device_desciption(item* dev)
 item* add_device(int type,int x,int y,bool in_inv)
 {
 	item* dev = new item();
+	dev->projection = add_actor(zoo[0],false,-500,-500,true);
 	dev->device_type = type;
 	dev->colour = COLOR_RED;
 	dev->wavelength = -1;
@@ -1001,8 +1287,8 @@ item* add_device(int type,int x,int y,bool in_inv)
 	dev->current_action = NULL_STIMULUS;
 	dev->next_action = NULL_STIMULUS;
 	dev->configuration = UNCONFIGURED;
+	dev->power_remaining = 100;
 	dev->player_has = false;
-	dev->already_exploded = false;
 	switch (type)
 	{
 	case 0:
@@ -1165,28 +1451,92 @@ void init()
 	noecho();
 	cbreak();
 	keypad(stdscr,TRUE);
+	scratch = newpad(viewport_height,viewport_width);
 	init_species();
 	init_map();
 	init_actors();
 	init_items();
+	add_message("The ship plays a cheerful tune, and the door opens. \"Automatic docking completed. Welcome to Spaceport X7/3A! Please enjoy your stay.\"");
 	target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
-	while(map_terrain[target_x][target_y] != FLOOR)
+	int acceptable_range = 70;
+	while(map_terrain[target_x][target_y] != FLOOR || d22(ship_x,ship_y,target_x,target_y) <= squarei(acceptable_range))
 	{
 		target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
+		if(rand()%4 != 0) acceptable_range--;
 	}
 	add_junk("radio transmitter","So this is what's been causing you so much trouble!",'?',COLOR_BLUE,target_x,target_y);
 }
+
+
 
 inline void draw_ch(int x,int y,char ch, int col)
 {
 	attron(COLOR_PAIR(col));
 	mvaddch(1+y-viewport_top_edge(),x-viewport_left_edge(),ch);
 }
+string walk_description(species* sp)
+{
+	if(sp->walk_energy > human_sp->walk_energy) return "fast";
+	else if(sp->walk_energy < human_sp->walk_energy) return "slow";
+	return "avrg";
+}
+string run_description(species* sp)
+{
+	if(sp->run_energy > human_sp->run_energy) return "fast";
+	else if(sp->run_energy < human_sp->run_energy) return "slow";
+	return "avrg";
+}
+string damage_description(species* sp)
+{
+	if(sp->damage <= 4) return "weak";
+	if(sp->damage <= 8) return "strg";
+	return "dngr";
+}
+string health_description(species* sp)
+{
+	if(sp->min_health <= 6) return "frail";
+	return "tough";
+}
+void draw_memory()
+{
+	for(int i=10;i<10+ZOO_SIZE;i++)
+	{
+		species* sp = zoo[i-9];
+		attron(COLOR_PAIR(sp->colour));
+		mvaddstr(i,viewport_width,string(1,sp->ch).c_str());
+		attron(COLOR_PAIR(COLOR_WHITE));
+		mvaddstr(i, viewport_width+2, (string(size_descriptors[sp->size])+" "+
+			walk_description(sp)+" "+run_description(sp)+" "+damage_description(sp)+
+			" "+health_description(sp)).c_str());
+	}
+}
 void draw_stats()
 {
-	mvprintw(3,viewport_width,"HP: %d/%d    ",p_ptr->health,p_ptr->sspecies->min_health);
-	mvprintw(4,viewport_width,"Ammo: %d,%d,%d      ",ammo[PISTOL],ammo[RIFLE],ammo[CANNON]);
+	attron(COLOR_PAIR(COLOR_WHITE));
+	for(int i=3;i<11+ZOO_SIZE;i++)
+	{
+		mvaddstr(i,viewport_width,string(disp_columns-viewport_width,' ').c_str());
+	}
+	mvprintw(3,viewport_width,"HP: %d/%d %s    ",p_ptr->health,p_ptr->sspecies->min_health,
+		p_ptr->running?"running":"       ");
+	mvprintw(4,viewport_width,(string("     ")+
+		string(current_weapon==PISTOL?"________ ":"         ")+
+		string(current_weapon==RIFLE?"_______ ":"        ")+
+		string(current_weapon==CANNON?"________":"        ")).c_str());
+	mvprintw(5,viewport_width,"Ammo X Pistol Y Rifle Z Cannon");
+	mvprintw(6,viewport_width,"          %3d     %3d       %2d",ammo[PISTOL],ammo[RIFLE],ammo[CANNON]);
+	mvprintw(7,viewport_width,"%10s %10s stamina",mode_text[current_mode],
+		string(10*p_ptr->stamina / p_ptr->sspecies->stamina,'*').c_str());
+	mvprintw(8,viewport_width,"Devic LEx HEx Hol Noi Sce Brn");
+	mvprintw(9,viewport_width,"Count A%2d B%2d C%2d D%2d E%2d F%2d",
+		count_inv_devices(LOW_EXPLOSIVE),count_inv_devices(HIGH_EXPLOSIVE),
+		count_inv_devices(HOLOGRAM_PROJECTOR),count_inv_devices(NOISE_GENERATOR),
+		count_inv_devices(SCENT_GENERATOR),count_inv_devices(BRAIN_SLICE));
+	mvprintw(10+ZOO_SIZE,viewport_width,(sound_this_turn+(sound_this_turn!=""?" from ":"")+dir_this_turn).c_str());
+	draw_memory();
 }
+
+
 
 bool los_exists(int x1, int y1, int x2, int y2)
 {
@@ -1221,8 +1571,6 @@ bool los_exists(int x1, int y1, int x2, int y2)
             error += delta_y;
 			if (x1 != x2)//(x1 != x2 && y1 != y2)
 			{
-				//if(debug)
-				//{draw_ch(x1,y1,'&',COLOR_WHITE); fgetch();draw_tile_debug(x1,y1);}
 				if (is_opaque(x1, y1)) return false;
 			}
         }
@@ -1262,14 +1610,12 @@ bool symmetrical_los(int x1, int y1, int x2, int y2)
 	return (los_exists(x1, y1, x2, y2) || los_exists(x2, y2, x1, y1));
 }
 
-void undraw_tile_description()
-{
-	for (int i=0;i<3;i++)
-	mvaddstr(i,viewport_width,string(disp_columns-viewport_width,' ').c_str());
-}
-
 void draw_tile_description(int x, int y)
 {
+	for(int i=0;i<3;i++)
+	{
+		mvaddstr(i,viewport_width,string(disp_columns-viewport_width,' ').c_str());
+	}
 	if (!map_seen[x][y] && !debug)
 	{
 		attron(COLOR_PAIR(COLOR_WHITE));
@@ -1290,9 +1636,19 @@ void draw_tile_description(int x, int y)
 			{
 				attron(COLOR_PAIR(map_occupants[x][y]->sspecies->colour));
 				mvaddstr(2,viewport_width,map_occupants[x][y]->sspecies->name.c_str());
+				if(current_mode == FIRE_MODE || current_mode == THROW_MODE)
+				{
+					attron(COLOR_PAIR(COLOR_WHITE));
+					mvaddstr(2, disp_columns-16," ('i' for info)");
+				}
 			}
 		}
 	}
+}
+void undraw_tile_description()
+{
+	for (int i=0;i<3;i++)
+	mvaddstr(i,viewport_width,string(disp_columns-viewport_width,' ').c_str());
 }
 
 char scent_strength(float scent)
@@ -1311,7 +1667,7 @@ char scent_strength(float scent)
 	
 }
 
-void draw_tile(int x, int y)
+void draw_tile(int x, int y,bool record_actors = false)
 {
 	char ch = terrain_chars[map_terrain[x][y]];
 	int colour = terrain_colours[map_terrain[x][y]];
@@ -1330,7 +1686,7 @@ void draw_tile(int x, int y)
 		{
 			ch = map_occupants[x][y]->sspecies->ch;
 			colour = map_occupants[x][y]->sspecies->colour;
-			if(map_occupants[x][y] != p_ptr)
+			if(map_occupants[x][y] != p_ptr && record_actors)
 			{
 				visible_actors.push_back(map_occupants[x][y]);
 			}
@@ -1462,29 +1818,13 @@ void undraw_line(int x1, int y1, int x2, int y2)
 	move(y2,x2);
 }
 
-void draw_info(int x,int y)
-{
-	for(int i = 0; y<10; y++)
-	{
-		mvaddstr(i,0,string(viewport_width,' ').c_str());
-	}
-	if(map_items[x][y] != NULL)
-	{
-		if(map_items[x][y]->device_type != NOT_DEVICE)
-		{
-			update_device_desciption(map_items[x][y]);
-		}
-		mvprintw(0,0,map_items[x][y]->description.c_str());
+bool nearer_actor (actor* a,actor* b)
+{ return (d22(a->x,a->y,p_ptr->x,p_ptr->y)<d22(b->x,b->y,p_ptr->x,p_ptr->y)); }
 
-	}
-	if(map_occupants[x][y] != NULL)
-	mvprintw(0,0,map_occupants[x][y]->sspecies->description.c_str());
-}
-
-void draw()
+void draw(bool record_actors=false)
 {
-	draw_last_msg();
 	draw_stats();
+	draw_tile_description(p_ptr->x,p_ptr->y);
 	centre_x = min(p_ptr->x,MAP_SIZE - viewport_width/2);
 	centre_x = max(centre_x,viewport_width/2);
 	centre_y = min(p_ptr->y,MAP_SIZE - viewport_height/2);
@@ -1493,10 +1833,12 @@ void draw()
 	{
 		for(int y=viewport_top_edge();y<viewport_bottom_edge(); y++)
 		{
-			draw_tile(x,y);
+			draw_tile(x,y,record_actors);
 		}
 	}
-	refresh();
+	sort(visible_actors.begin(),visible_actors.end(),nearer_actor);
+	draw_last_msg();
+	wrefresh(stdscr);
 }
 int move_actor(actor* a, int dx, int dy)
 {
@@ -1516,8 +1858,41 @@ int move_actor(actor* a, int dx, int dy)
 		a->ai_x = x; a->ai_y = y;
 	}
 	a->x = x; a->y = y;
-
+	if(a->running)
+	{
+		make_noise(x,y,&walk_noise[a->sspecies->id][map_terrain[x][y]]);
+	}
+	else
+	{
+		make_noise(x,y,&run_noise[a->sspecies->id][map_terrain[x][y]]);
+	}
 	return 0;
+}
+
+void draw_info(int x,int y)
+{
+	current_mode = INFO_MODE;
+	draw_stats();
+	string s;
+	//for(int i = 0; y<10; y++)
+	//{
+	//	mvaddstr(i,0,string(viewport_width,' ').c_str());
+	//}
+	if(map_items[x][y] != NULL)
+	{
+		if(map_items[x][y]->device_type != NOT_DEVICE)
+		{
+			update_device_desciption(map_items[x][y]);
+		}
+		//mvprintw(0,0,map_items[x][y]->description.c_str());
+		s += map_items[x][y]->description;
+	}
+	if(map_occupants[x][y] != NULL)
+	//mvprintw(0,0,map_occupants[x][y]->sspecies->description.c_str());
+	s += map_occupants[x][y]->sspecies->description;
+	draw_text_wodge(s);
+	getch();
+	draw();
 }
 
 inline bool in_vis_range(int x, int y, int xx, int yy)
@@ -1549,7 +1924,6 @@ void win()
 	map_terrain[ship_x+2][ship_y] = NS;
 	add_message("You close the doors and fly away! Press Q to quit.");
 	draw();
-	draw();
 	int kp = 0;
 	while(kp != 'Q') kp = fgetch();
 	endwin();
@@ -1569,6 +1943,7 @@ void hurt_actor(actor* a,int damage)
 
 void do_explosion(explosion ex)
 {
+	make_noise(ex.x,ex.y,&(ex.radius <3?LE_noise:HE_noise));
 	int dam = 0;
 	for(int i = -ex.radius; i<= ex.radius; i++)
 	{
@@ -1593,6 +1968,18 @@ void do_explosion(explosion ex)
 					hurt_actor(map_occupants[ex.x+i][ex.y+j],dam);
 				}
 			}
+			if(dam>=10)
+			{
+				switch(map_terrain[ex.x+i][ex.y+j])
+				{
+				case WALL:
+					map_terrain[ex.x+i][ex.y+j] = FLOOR; break;
+				case BTREE:
+					map_terrain[ex.x+i][ex.y+j] = DIRT; break;
+				case STREE:
+					map_terrain[ex.x+i][ex.y+j] = DIRT; break;
+				}
+			}
 		}
 	}
 }
@@ -1603,18 +1990,14 @@ void melee_attack(actor* attacker, actor* defender)
 	hurt_actor(defender,attacker->sspecies->damage);
 }
 
-void fire_weapon(int x1, int y1, int x2, int y2)
+bool fire_weapon(int x1, int y1, int x2, int y2)
 {
-	add_message("BANG!");
 	if(los_exists(x1,y1,x2,y2))
 	{
-		actor* victim = map_occupants[x2][y2];
-		if(victim != NULL)
+		add_message("BANG!");
+		int damage = 0;
+		switch(current_weapon)
 		{
-			add_message("The "+victim->sspecies->name+" is hit!");
-			int damage = 0;
-			switch(current_weapon)
-			{
 			case PISTOL:
 				damage = rand()%2 + 1;
 				ammo[PISTOL] -= 1;
@@ -1627,10 +2010,22 @@ void fire_weapon(int x1, int y1, int x2, int y2)
 				damage = rand()%4+5;
 				ammo[CANNON] -= 1;
 				break;
-			}
+		}
+		actor* victim = map_occupants[x2][y2];
+		if(victim != NULL)
+		{
+			add_message("The "+victim->sspecies->name+" is hit!");
 			hurt_actor(victim,damage);
+			return true;
 		}
 	}
+	else
+	{
+		add_message("Can't get a clear shot!"); 
+		draw_last_msg();
+		return false;
+	}
+	return true;
 }
 
 void scent_walk(actor* a)
@@ -1676,6 +2071,11 @@ void random_walk(actor* a)
 	}
 }
 
+void hologram_turn(actor* a)
+{
+
+}
+
 
 void ai_turn(actor* a)
 {
@@ -1701,16 +2101,22 @@ void ai_turn(actor* a)
 		if(symmetrical_los(a->x,a->y,p_ptr->x,p_ptr->y))
 		{
 			a->ai_x = p_ptr->x; a->ai_y = p_ptr->y;
+			if((p_ptr->running ? human_sp->run_energy : human_sp->walk_energy) > a->sspecies->walk_energy
+				&& a->stamina > a->sspecies->stamina/4)
+			{
+				a->running = true;
+			}
 			uncertain = false;
 		}
 	}
-	if(uncertain && a->sspecies->hearing && rand()%10 < 3)
-	{
-		a->ai_x = p_ptr->x; a->ai_y = p_ptr->y;
-		uncertain = false;
-	}
+	//if(uncertain && a->sspecies->hearing && rand()%10 < 3)
+	//{
+	//	a->ai_x = p_ptr->x; a->ai_y = p_ptr->y;
+	//	uncertain = false;
+	//}
 	if(a->x==a->ai_x && a->y ==a->ai_y)
 	{
+		a->running = false;
 		if(a->sspecies->smell_clarity)
 		{
 			scent_walk(a); return;
@@ -1788,9 +2194,9 @@ int select_device()
 	mvaddstr(1,0, padmsg(string(count_inv_devices(LOW_EXPLOSIVE)?"a. Low explosive, ":"") +
 		string(count_inv_devices(HIGH_EXPLOSIVE)?"b. High explosive, ":"")).c_str());
 	mvaddstr(2,0,padmsg(string(count_inv_devices(HOLOGRAM_PROJECTOR)?"c. Hologram projector,":"")+
-		string(count_inv_devices(NOISE_GENERATOR)?"c. Noise generator, ":"")).c_str());
-	mvaddstr(3,0,padmsg(string(count_inv_devices(SCENT_GENERATOR)?"d. Scent generator, ":"")+
-		string(count_inv_devices(BRAIN_SLICE)?"e. Brain slice":"")).c_str());
+		string(count_inv_devices(NOISE_GENERATOR)?"d. Noise generator, ":"")).c_str());
+	mvaddstr(3,0,padmsg(string(count_inv_devices(SCENT_GENERATOR)?"e. Scent generator, ":"")+
+		string(count_inv_devices(BRAIN_SLICE)?"f. Brain slice":"")).c_str());
 	bool unacceptable = true;
 	int device_num;
 	int kp;
@@ -1912,41 +2318,6 @@ int ask_for_wavelength()
 	draw();
 	return w;
 }
-void set_timer(item* dev,int t)
-{
-	if(dev->configuration != ON_TIMER)
-	{
-		timer_devices.push_back(dev);
-		if(dev->player_has)
-		{
-			inv_remove(dev);
-			dev_inv[dev->device_type][ON_TIMER].push_back(dev);
-		}
-	}
-	if(dev->configuration == ON_REMOTE)
-	{
-		rm_devices[dev->wavelength] = NULL;
-		dev->wavelength = -1;
-	}
-	dev->configuration = ON_TIMER;
-	dev->time_remaining = t;
-}
-
-void set_remote(item* dev,int w)
-{
-	if(dev->player_has && dev->configuration != ON_REMOTE)
-	{
-		inv_remove(dev);
-		dev_inv[dev->device_type][ON_REMOTE].push_back(dev);
-	}
-	if(dev->configuration == ON_TIMER)
-	{
-		dev->time_remaining = -1;
-		kill_velement(timer_devices,dev);
-	}
-	dev->configuration = ON_REMOTE;
-	dev->wavelength = w;
-}
 
 void set_unconfigured(item* dev)
 {
@@ -1966,6 +2337,44 @@ void set_unconfigured(item* dev)
 		dev->wavelength = -1;
 	}
 	dev->configuration = UNCONFIGURED;
+}
+
+void set_timer(item* dev,int t)
+{
+	if(dev->configuration != ON_TIMER)
+	{
+		set_unconfigured(dev);
+		timer_devices.push_back(dev);
+		if(dev->player_has)
+		{
+			inv_remove(dev);
+			dev_inv[dev->device_type][ON_TIMER].push_back(dev);
+		}
+	}
+	//if(dev->configuration == ON_REMOTE)
+	//{
+	//	rm_devices[dev->wavelength] = NULL;
+	//	dev->wavelength = -1;
+	//}
+	dev->configuration = ON_TIMER;
+	dev->time_remaining = t;
+}
+
+void set_remote(item* dev,int w)
+{
+	if(dev->player_has && dev->configuration != ON_REMOTE)
+	{
+		set_unconfigured(dev);
+		inv_remove(dev);
+		dev_inv[dev->device_type][ON_REMOTE].push_back(dev);
+	}
+	//if(dev->configuration == ON_TIMER)
+	//{
+	//	dev->time_remaining = -1;
+	//	kill_velement(timer_devices,dev);
+	//}
+	dev->configuration = ON_REMOTE;
+	dev->wavelength = w;
 }
 
 bool reconfigure(item* a)
@@ -2086,7 +2495,7 @@ item* select_individual_device()
 void player_turn(actor* a)
 {
 	update_map_seen();
-	draw();
+	draw(true);
 	int turn = -1;
 	while(turn)
 	{
@@ -2121,11 +2530,17 @@ void player_turn(actor* a)
 			turn = 0; add_message(signal_strength(p_ptr->x,p_ptr->y)); draw_last_msg(); break;
 		case 'd':
 			debug = !debug; break;
+		case ' ':
+			last_message_seen = rlmessages.size();
+			draw_last_msg(); break;
+		case 'R':
+			p_ptr->running = !p_ptr->running; draw_stats(); break;
 		case 't':
 			{
-				bool throw_mode = true;
+				current_mode = THROW_MODE;
+				draw();
 				int lx = p_ptr->x; int ly = p_ptr->y;
-			while(throw_mode)
+			while(current_mode==THROW_MODE)
 			{
 				draw_tile_description(lx,ly);
 				draw_line(p_ptr->x,p_ptr->y,lx,ly,'*');
@@ -2152,21 +2567,31 @@ void player_turn(actor* a)
 					lx = min(lx+1,viewport_right_edge()); ly = min(ly+1,viewport_bottom_edge()); break;
 				case 't':
 					{
-						item* dev = select_individual_device();
-						
-						if(dev != NULL)
+						if(los_exists(p_ptr->x,p_ptr->y,lx,ly))
 						{
-							item_to_location(dev,lx,ly);
-							turn = 0;
-							throw_mode = false;
-							dev->player_has = false;
+							item* dev = select_individual_device();
+						
+							if(dev != NULL)
+							{
+								item_to_location(dev,lx,ly);
+								turn = 0;
+								current_mode = WALK_MODE;
+								dev->player_has = false;
+							}
+						}
+						else
+						{
+							add_message("There's too much in the way!");
+							draw_last_msg();
 						}
 					}
 					break;
 				case KEY_ESC:
-					 throw_mode = false; break;
+					 current_mode = WALK_MODE; draw(); break;
 				case 'i':
-					draw_info(lx,ly); fgetch(); draw(); break;
+					draw_info(lx,ly);
+					current_mode = THROW_MODE; draw_stats();
+					draw_line(p_ptr->x,p_ptr->y,lx,ly,'*');break;
 				default: ;
 				}
 			}
@@ -2174,7 +2599,8 @@ void player_turn(actor* a)
 			break;
 		case 'f':
 		{
-			bool fire_mode = true;
+			current_mode = FIRE_MODE;
+			draw();
 			int lx,ly;
 			if(current_target == NULL) current_target = p_ptr;
 			if(symmetrical_los(current_target->x,current_target->y,p_ptr->x,p_ptr->y))
@@ -2185,14 +2611,15 @@ void player_turn(actor* a)
 			{
 				lx = p_ptr->x; ly = p_ptr->y;
 			}
-			while (fire_mode)
+			int tab_ind = -1;
+			while (current_mode == FIRE_MODE)
 			{
 				draw_tile_description(lx,ly);
 				draw_line(p_ptr->x,p_ptr->y,lx,ly,'*');
 				int kpp = fgetch();
 				undraw_line(p_ptr->x,p_ptr->y,lx,ly);
 				undraw_tile_description();
-				int tab_ind = -1;
+				
 				switch(kpp)
 				{
 				case '\t':
@@ -2229,15 +2656,21 @@ void player_turn(actor* a)
 					}
 					else
 					{
-						fire_mode = false;
-						fire_weapon(p_ptr->x,p_ptr->y,lx,ly);
-						turn = 0;
+						if(fire_weapon(p_ptr->x,p_ptr->y,lx,ly))
+						{
+							current_mode = WALK_MODE;
+							turn = 0;
+						}
 					}
 					break;
 				case KEY_ESC:
-					 fire_mode = false; break;
+					 current_mode = WALK_MODE; 
+					 draw();
+					 break;
 				case 'i':
-					draw_info(lx,ly); fgetch(); draw(); break;
+					draw_info(lx,ly);
+					current_mode = FIRE_MODE; draw_stats();
+					draw_line(p_ptr->x,p_ptr->y,lx,ly,'*');
 				default:;
 				}
 			}
@@ -2286,7 +2719,7 @@ int play_turn()
 		for(vector<actor*>::iterator a = actors.begin(); a != actors.end(); ++a)
 		{
 			actor* act = (*a);
-			if (act->sspecies->name == "human" && !act->is_player)
+			if (act->sspecies->name == "human" && !act->is_player && !act->is_hologram)
 			{
 				map_human_scent[act->x][(*a)->y] += 0.7f; //non-player humans get an easier time >:)
 			}
@@ -2298,12 +2731,18 @@ int play_turn()
 					int stamina_consumed = (act->stamina * (act->sspecies->run_energy - act->sspecies->walk_energy))/act->sspecies->stamina;
 					act->energy += min(stamina_consumed,act->stamina);
 					act->stamina -=  min(stamina_consumed,act->stamina);
-					if (stamina_consumed == 0) act->running = false;
-					
+					if (stamina_consumed == 0)
+					{
+						if(act->is_player)
+						{
+							add_message("You are too exhausted to continue running.");
+						}
+						act->running = false;
+					}
 				}
-				else
+				else if(act->energy > 100)
 				{
-					act->stamina += act->sspecies->stamina/10;
+					act->stamina += act->sspecies->stamina/70;
 					act->stamina = min(act->stamina,act->sspecies->stamina);
 				}
 				if (act->is_player)
@@ -2317,7 +2756,11 @@ int play_turn()
 						}
 						act->energy -= 100;
 						player_turn(act);
-						
+						act->most_noticeable_sound = 0.0;
+						sound_this_turn = "";
+						dir_this_turn = "";
+						act->sound_threshold = max(act->sound_threshold-act->sspecies->hearing_adapt,act->sspecies->hearing_thres);
+
 						visible_actors.clear();
 					}
 					if(!debug && !(turn_count %5))
@@ -2335,24 +2778,52 @@ int play_turn()
 						}
 						else
 						{
-							activate_this_turn.push_back(*dev);
+							if((*dev)->device_type == LOW_EXPLOSIVE || (*dev)->device_type == HIGH_EXPLOSIVE)
+							{
+								explode_this_turn.push_back(*dev);
+							}
+							else
+							{
+								active_devices.push_back(*dev);
+								(*dev)->current_action = (*dev)->next_action;
+							}
 							dev = timer_devices.erase(dev);
 						}
 					}
-					for(vector<item*>::iterator dev = activate_this_turn.begin(); dev != activate_this_turn.end(); ++dev)
+					for(vector<item*>::iterator dev = active_devices.begin(); dev != active_devices.end(); ++dev)
+					{
+						if((*dev)->device_type == SCENT_GENERATOR)
+						{
+							map_human_scent[(*dev)->x][(*dev)->y] += ((*dev)->power_remaining*1200)/100;
+							if(rand()%7 < 2) (*dev)->power_remaining -= 1;
+							(*dev)->power_remaining = max(0,(*dev)->power_remaining);
+						}
+						if((*dev)->device_type == HOLOGRAM_PROJECTOR)
+						{
+							;
+						}
+					}
+					for(vector<item*>::iterator dev = explode_this_turn.begin(); dev != explode_this_turn.end(); ++dev)
 					{
 						set_unconfigured(*dev);
 						//remove(timer_devices.begin(),timer_devices.end(),*dev);
 						activate_device(*dev);
 					}
-					activate_this_turn.erase(activate_this_turn.begin(),activate_this_turn.end());
+					explode_this_turn.erase(explode_this_turn.begin(),explode_this_turn.end());
 					for(vector<explosion>::iterator ex = explosions_this_turn.begin(); ex != explosions_this_turn.end(); ex++)
 					{
 						do_explosion(*ex);
 					}
 					explosions_this_turn.erase(explosions_this_turn.begin(),explosions_this_turn.end());
-					turn_count += 1;
-					turn_count -= 1;
+				}
+				else if (act->is_hologram)
+				{
+					if(act->energy > 100)
+					{
+						act->energy -= 100;
+						if(on_map(act->x,act->y))
+							hologram_turn(act);
+					}
 				}
 				else
 				{
@@ -2360,6 +2831,8 @@ int play_turn()
 					{
 						act->energy -= 100;
 						ai_turn(act);
+						act->most_noticeable_sound = 0.0;
+						act->sound_threshold = max(act->sound_threshold-act->sspecies->hearing_adapt,act->sspecies->hearing_thres);
 					}
 				}
 			}
@@ -2367,6 +2840,7 @@ int play_turn()
 		if(rand()%4000+150+turn_count >4000 && rand()%70 == 0)
 		{
 			pair<int,int> loc = random_occupiable_square();
+
 			add_actor(zoo[rand()%ZOO_SIZE+1],false,loc.first,loc.second);
 		}
 	return 0;
