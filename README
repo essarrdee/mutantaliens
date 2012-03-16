@@ -23,3 +23,6 @@ You will also tend to be deaf for quite a long time after using explosives.
 
 Try to use your radio to find the radio transmitter, destroy it by throwing explosives, and get back into the ship, without getting killed.
 bug reports/comments to (quendus at google's email domain)
+
+The current executable requires the microsoft visual C++ redistributable package (32 bit), available at http://www.microsoft.com/download/en/details.aspx?id=5555
+I'm working on a MinGW-compiled version with no dependencies, but it has a crash not present in the VS-compiled version. Hence the VS version is included in the current official binary.
