@@ -888,7 +888,10 @@ actor* add_actor(species* sp, bool p, int xx, int yy,bool hologram=false)
 	a->runaway_x = -500;
 	a->runaway_y = -500;
 	actors.push_back(a);
+	if(!hologram)
+	{
 	map_occupants[xx][yy] = a;
+	}
 	a->health = (sp->health_range? rand()%(sp->health_range):0)+sp->min_health;
 	a->sound_threshold = a->sspecies->hearing_thres;
 	return a;
