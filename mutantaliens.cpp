@@ -44,7 +44,7 @@ make buildings multilevel
 
 inline int squarei(int x) {return x*x;}
 inline float squaref(float x) {return x*x;}
-using namespace std;
+//using namespace std;
 
 WINDOW* scratch;
 
@@ -112,8 +112,8 @@ const int MAX_IDENTICAL_DEVICES = 10;
 const int ZOO_SIZE = 7;
 
 const char* const config_names[] = {"unconfigured", "on a timer", "remote controlled"};
-vector<string> vconfig_names(config_names,config_names+DEVICE_CONFIGURATIONS);
-template<class T> void kill_velement(vector<T>& vec, T elem)
+std::vector<std::string> vconfig_names(config_names,config_names+DEVICE_CONFIGURATIONS);
+template<class T> void kill_velement(std::vector<T>& vec, T elem)
 {
 	vec.erase(std::remove(vec.begin(), vec.end(), elem), vec.end());
 
@@ -144,7 +144,7 @@ int ship_y;
 
 inline int dinf(int x,int y,int xx,int yy)
 {
-	return max(abs(x-xx),abs(y-yy));
+	return std::max(abs(x-xx),abs(y-yy));
 }
 
 inline int d1(int x,int y,int xx,int yy)
@@ -161,9 +161,9 @@ inline int fgetch()
 	int kp = getch(); flushinp(); return kp;
 }
 
-const pair<int,int> directions[] = { make_pair(1,0), make_pair(1,1), make_pair(0,1), make_pair(-1,1),
-									 make_pair(-1,0), make_pair(-1,-1), make_pair(0,-1), make_pair(1,-1)};
-vector<pair<int,int>> vdirections(directions,directions+8);
+const std::pair<int,int> directions[] = { std::make_pair(1,0), std::make_pair(1,1), std::make_pair(0,1), std::make_pair(-1,1),
+									 std::make_pair(-1,0), std::make_pair(-1,-1), std::make_pair(0,-1), std::make_pair(1,-1)};
+std::vector<std::pair<int,int>> vdirections(directions,directions+8);
 inline bool on_map(int x,int y)
 {
 	if (x < 0 || y < 0) return false;
@@ -177,24 +177,24 @@ float randfloat()
 	return (float)rand()/(float)RAND_MAX;
 }
 
-vector<string> rlmessages;
+std::vector<std::string> rlmessages;
 int last_message_seen=0;
-inline string padmsg(string msg)
+inline std::string padmsg(std::string msg)
 {
-	return msg + string(viewport_width-msg.length(),' ');
+	return msg + std::string(viewport_width-msg.length(),' ');
 }
-void add_message(string msg)
+void add_message(std::string msg)
 {
 	//if(msg.length() > viewport_width) return 1;
 	rlmessages.push_back(msg);
 	//return 0;
 }
 
-void draw_text_wodge(string s)
+void draw_text_wodge(std::string s)
 {
 	int lines = (int)ceil(((float)s.length())/viewport_width);
 	attron(COLOR_PAIR(COLOR_WHITE));
-	mvaddstr(lines-1,0,string(viewport_width,' ').c_str());
+	mvaddstr(lines-1,0,std::string(viewport_width,' ').c_str());
 	for(int i=0;i<lines;i++)
 	{
 		mvaddstr(i,0,(s.substr(viewport_width*i,viewport_width).c_str()));
@@ -205,26 +205,26 @@ void draw_text_wodge(string s)
 void draw_last_msg()
 {
 	//attron(COLOR_PAIR(COLOR_WHITE));
-	string s = "";
+	std::string s = "";
 	for(unsigned int i = last_message_seen; i < rlmessages.size(); i++)
 	{
 		s += rlmessages[i]; s += " ";
 	}
 	draw_text_wodge(s);
-	last_message_seen = max(last_message_seen,(int)rlmessages.size()-2);
+	last_message_seen = std::max(last_message_seen,(int)rlmessages.size()-2);
 	//mvaddstr(0,0,padmsg(rlmessages.back()).c_str());
 }
 
 struct noise
 {
 	float volume;
-	string describe;
+	std::string describe;
 	bool scary;
 };
 noise LE_noise = {30.0,"explosion",true};
 noise HE_noise = {60.0,"big explosion",true};
-vector<vector<noise>> walk_noise(ZOO_SIZE+1,vector<noise>(TERRAIN_TYPES));
-vector<vector<noise>> run_noise(ZOO_SIZE+1,vector<noise>(TERRAIN_TYPES));
+std::vector<std::vector<noise>> walk_noise(ZOO_SIZE+1,std::vector<noise>(TERRAIN_TYPES));
+std::vector<std::vector<noise>> run_noise(ZOO_SIZE+1,std::vector<noise>(TERRAIN_TYPES));
 
 struct species
 {
@@ -244,8 +244,8 @@ struct species
 	int size;
 	noise still_noise;
 	noise melee_noise;
-	string syl1, syl2, name;
-	string description;
+	std::string syl1, syl2, name;
+	std::string description;
 };
 
 inline int viewport_left_edge()
@@ -265,11 +265,11 @@ inline int viewport_bottom_edge()
 	return centre_y+viewport_height/2;
 }
 
-vector<species*> zoo;
+std::vector<species*> zoo;
 species* human_sp;
 
 const char* const clusters_1[] = {"b","c","d","f","g","h","j","k","l","m","n","p","r","s","t","v","w","x","y","z"};
-vector<string> vclusters_1(clusters_1,arrayend(clusters_1));
+std::vector<std::string> vclusters_1(clusters_1,arrayend(clusters_1));
 const char* const start_clusters_2[] = {"bh","bl","br","bw","by","bz","ch","cj","cl","cn","cr","cw","dh","dj","dl","dr",
 	"dv","dw","dy","dz","fd","fj","fk","fl","fm","fn","fp","ft","fw","fy","gh","gj","gl","gn","gr","gv","gw",
 	"gy","gz","hj","hl","hr","hy","hw","jh","jl","jn","jy","kf","kh","kj","kl","kn","kr","ks","kv","kw","ky",
@@ -278,22 +278,22 @@ const char* const start_clusters_2[] = {"bh","bl","br","bw","by","bz","ch","cj",
 	"sh","sj","sk","sl","sm","sn","sp","sr","st","sv","sw","sy","sz","th","tj","tl","tr","ts","tw","ty","tz",
 	"vh","vj","vk","vl","vm","vn","vp","vr","vt","vw","vy","vz","wh","wr","wy","zb","zc","zd","zf","zg","zh",
 	"zj","zk","zl","zm","zn","zp","zr","zs","zt","zv","zw","zy","zz"};
-vector<string> vstart_clusters_2(start_clusters_2,arrayend(start_clusters_2));
+std::vector<std::string> vstart_clusters_2(start_clusters_2,arrayend(start_clusters_2));
 const char* const start_clusters_3[] = {"chl","chr","scl","scr","skl","skr","spl","spr","str","str"};
-vector<string> vstart_clusters_3(start_clusters_3,arrayend(start_clusters_3));
+std::vector<std::string> vstart_clusters_3(start_clusters_3,arrayend(start_clusters_3));
 const char* const pure_vowels[] = {"a","aa","e","ee","i","oo","u","uu"};
-vector<string> vpure_vowels(pure_vowels,arrayend(pure_vowels));
+std::vector<std::string> vpure_vowels(pure_vowels,arrayend(pure_vowels));
 const char* const diphthongs[] = {"ae","ai","ao","au","aw","ay","ea","ei","eo","eu","ew","ey","ia","ie","io","iu","oa",
 	"oe","oi","ou","ow","oy","ua","ue","ui","uo","uy","uw"};
-vector<string> vdiphthongs(diphthongs,arrayend(diphthongs));
+std::vector<std::string> vdiphthongs(diphthongs,arrayend(diphthongs));
 const char* const end_clusters_2[] = {"bb","bh","bl","br","bz","cc","ch","ck","cl","cr","cs","cr","cz","dd","dh",
 	"dj","dl","dr","dt","dz","ff","fh","fl","fp","ft","fs","ft","gg","gh","gl","gr","gz","jj","kh","kk","kl",
 	"kr","ks","kt","lb","lc","ld","lf","lg","lh","lj","lk","ll","lm","ln","lp","ls","lt","lv","lx","lz","mb",
 	"mf","mh","mm","mp","ms","mz","nc","nd","nf","ng","nh","nj","nk","nn","ns","nt","nx","nz","pl","pp","pr",
 	"ps","sh","sp","ss","st","vv","vh","vz","xx","zb","zd","zg","zh","zj","zl","zz"};
-vector<string> vend_clusters_2(end_clusters_2,arrayend(end_clusters_2));
-//const string end_clusters_3[] = {""};
-string random_start_cluster()
+std::vector<std::string> vend_clusters_2(end_clusters_2,arrayend(end_clusters_2));
+//const std::string end_clusters_3[] = {""};
+std::string random_start_cluster()
 {
 	switch (rand()%10)
 	{
@@ -305,7 +305,7 @@ string random_start_cluster()
 		return start_clusters_3[rand()%vstart_clusters_3.size()];
 	}
 }
-string random_vowel()
+std::string random_vowel()
 {
 	switch (rand()%5)
 	{
@@ -315,7 +315,7 @@ string random_vowel()
 		return diphthongs[rand()%vdiphthongs.size()];
 	}
 }
-string random_end_cluster()
+std::string random_end_cluster()
 {
 	switch (rand()%7)
 	{
@@ -327,9 +327,9 @@ string random_end_cluster()
 	//	return start_clusters_3[rand()%start_clusters_3->length()];
 	}
 }
-string random_syllable()
+std::string random_syllable()
 {
-	string syl = "";
+	std::string syl = "";
 	switch (rand()%5)
 	{
 	case 0:
@@ -360,11 +360,11 @@ void init_species()
 	human->size = 1;
 	noise wn[TERRAIN_TYPES] = {{1.0,"footsteps",false},{1.5,"footsteps",false},{1.5f,"footsteps",false},{2.0,"footsteps",false},{0.0,"",false},
 	{2.3f,"footsteps",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false}};
-	walk_noise[0] = vector<noise>(wn,wn+TERRAIN_TYPES);
+	walk_noise[0] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
 	//delete [] wn;
 	noise rn[TERRAIN_TYPES] = {{2.0,"footsteps",false},{3.0,"footsteps",false},{3.5f,"footsteps",false},{3.0,"footsteps",false},{0.0,"",false},
 	{3.3f,"footsteps",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false}};
-	run_noise[0] = vector<noise>(rn,rn+TERRAIN_TYPES);
+	run_noise[0] = std::vector<noise>(rn,rn+TERRAIN_TYPES);
 	//delete [] rn;
 	
 	
@@ -389,8 +389,8 @@ void init_species()
 		else if(spsp==ZOO_SIZE - 2) size = 1;
 		else if(spsp==ZOO_SIZE-3) size = 0;
 		alien->size = size;
-		string walk_str;
-		string run_str;
+		std::string walk_str;
+		std::string run_str;
 		float extra_noise;
 		switch(size)
 		{
@@ -454,8 +454,8 @@ void init_species()
 				run_str = "scampering"; break;
 			}
 			extra_noise = -4.0;
-			walk_noise[spsp] = vector<noise>(wn,wn+TERRAIN_TYPES);
-			run_noise[spsp] = vector<noise>(rn,rn+TERRAIN_TYPES);
+			walk_noise[spsp] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
+			run_noise[spsp] = std::vector<noise>(rn,rn+TERRAIN_TYPES);
 			for(int i=0;i<TERRAIN_TYPES;i++)
 			{
 				walk_noise[spsp][i].describe = walk_str;
@@ -507,7 +507,7 @@ void init_species()
 			alien->walk_energy = rand()%4+8;
 			alien->run_energy = ((rand()%10+5)*alien->walk_energy)/5 + rand()%4;
 			alien->stamina = 4*((rand()%5+7)*alien->run_energy + rand()%(2*alien->run_energy));
-						walk_noise[spsp] = vector<noise>(wn,wn+TERRAIN_TYPES);
+						walk_noise[spsp] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
 
 			switch(rand()%3)
 			{
@@ -526,8 +526,8 @@ void init_species()
 				run_str = "running"; break;
 			}
 			extra_noise = 0.0;
-			walk_noise[spsp] = vector<noise>(wn,wn+TERRAIN_TYPES);
-			run_noise[spsp] = vector<noise>(rn,rn+TERRAIN_TYPES);
+			walk_noise[spsp] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
+			run_noise[spsp] = std::vector<noise>(rn,rn+TERRAIN_TYPES);
 			for(int i=0;i<TERRAIN_TYPES;i++)
 			{
 				walk_noise[spsp][i].describe = walk_str;
@@ -596,8 +596,8 @@ void init_species()
 				run_str = "charging"; break;
 			}
 			extra_noise = 4.0;
-			walk_noise[spsp] = vector<noise>(wn,wn+TERRAIN_TYPES);
-			run_noise[spsp] = vector<noise>(rn,rn+TERRAIN_TYPES);
+			walk_noise[spsp] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
+			run_noise[spsp] = std::vector<noise>(rn,rn+TERRAIN_TYPES);
 			for(int i=0;i<TERRAIN_TYPES;i++)
 			{
 				walk_noise[spsp][i].describe = walk_str;
@@ -609,10 +609,10 @@ void init_species()
 		/*char buf[1000] = "";
 		sprintf(buf,"A %s is a %s creature %s.",
 			alien->name.c_str(),
-			(string(alien->psychic_range?"psychic":"")+string(alien->psychic_range&&alien->sees?", ":"")+string(alien->sees?"sighted":"")).c_str(),
-			(string(alien->smells||alien->hears?"with good ":"")+string(alien->hears?"hearing":"")+
-			 string(alien->hears&&alien->smells?" and ":"")+string(alien->smells?"sense of smell":"")).c_str());
-		alien->description = string(buf);*/
+			(std::string(alien->psychic_range?"psychic":"")+std::string(alien->psychic_range&&alien->sees?", ":"")+std::string(alien->sees?"sighted":"")).c_str(),
+			(std::string(alien->smells||alien->hears?"with good ":"")+std::string(alien->hears?"hearing":"")+
+			 std::string(alien->hears&&alien->smells?" and ":"")+std::string(alien->smells?"sense of smell":"")).c_str());
+		alien->description = std::string(buf);*/
 		zoo.push_back(alien);
 	}
 }
@@ -635,7 +635,7 @@ struct actor
 	float most_noticeable_sound;
 };
 actor* current_target = NULL;
-vector<actor*> visible_actors;
+std::vector<actor*> visible_actors;
 actor* p_ptr = NULL;
 actor* map_occupants[MAP_SIZE][MAP_SIZE];
 bool terrain_immovable(actor* a, int x, int y)
@@ -646,14 +646,14 @@ bool terrain_immovable(actor* a, int x, int y)
 	return false;
 }
 
-pair<int,int> random_occupiable_square()
+std::pair<int,int> random_occupiable_square()
 {
 	int target_x = rand()%MAP_SIZE; int target_y = rand()%MAP_SIZE;
 	while(map_terrain[target_x][target_y])
 	{
 		target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
 	}
-	return make_pair(target_x,target_y);
+	return std::make_pair(target_x,target_y);
 }
 
 struct item
@@ -661,9 +661,9 @@ struct item
 	actor* projection;
 	int colour;
 	char ch;
-	string name;
-	string description;
-	string base_description;
+	std::string name;
+	std::string description;
+	std::string base_description;
 	int device_type;
 	int wavelength;
 	int power_remaining;
@@ -681,22 +681,22 @@ struct explosion
 {
 	int x; int y; int radius; int centre_damage;
 };
-vector<explosion> explosions_this_turn;
-vector<item*> explode_this_turn;
-vector<item*> active_devices;
+std::vector<explosion> explosions_this_turn;
+std::vector<item*> explode_this_turn;
+std::vector<item*> active_devices;
 item* rm_devices[WAVELENGTHS];
-vector<item*> timer_devices;
-vector<item*> next_timer_devices;
+std::vector<item*> timer_devices;
+std::vector<item*> next_timer_devices;
 item* map_items[MAP_SIZE][MAP_SIZE];
-vector<actor*> actors;
-vector<item*> items;
-vector<item*> devices;
-vector<vector<vector<item*>>> dev_inv;//type,configuration,individual. Not joking.
+std::vector<actor*> actors;
+std::vector<item*> items;
+std::vector<item*> devices;
+std::vector<std::vector<std::vector<item*>>> dev_inv;//type,configuration,individual. Not joking.
 
 
 const float ideal_clarity = 2.0;
-string sound_this_turn = "";
-string dir_this_turn = "";
+std::string sound_this_turn = "";
+std::string dir_this_turn = "";
 void react_to_noise(actor* a,noise* n,int xx, int yy)
 {
 	if(a->is_player)
@@ -733,7 +733,7 @@ void react_to_noise(actor* a,noise* n,int xx, int yy)
 
 void make_noise(int x,int y,noise* n)
 {
-for(vector<actor*>::iterator a = actors.begin(); a != actors.end(); ++a)
+for(std::vector<actor*>::iterator a = actors.begin(); a != actors.end(); ++a)
 {
 	if(!(*a)->dead && !(*a)->is_hologram)
 	{
@@ -743,7 +743,7 @@ for(vector<actor*>::iterator a = actors.begin(); a != actors.end(); ++a)
 		float clarity2 = abs(clarity-ideal_clarity);
 		if(clarity > 0)
 		{
-			(*a)->sound_threshold  = max((*a)->sound_threshold,rel_vol - ideal_clarity);
+			(*a)->sound_threshold  = std::max((*a)->sound_threshold,rel_vol - ideal_clarity);
 		}
 		if((*a)->most_noticeable_sound < clarity)
 		{
@@ -796,22 +796,22 @@ int total_inv_devices()
 	return ret;
 }
 
-pair<int,int> nearby_home_for_item(int x,int y)
+std::pair<int,int> nearby_home_for_item(int x,int y)
 {
 	if(map_items[x][y] == NULL && !(map_terrain[x][y]==WALL))
 	{
-		return make_pair(x,y);
+		return std::make_pair(x,y);
 	}
 	for(int d=0;d<8;d++)
 	{
-		pair<int,int> dir = directions[d];
+		std::pair<int,int> dir = directions[d];
 		int xx = x+dir.first; int yy =y+dir.second;
 		if(map_items[xx][yy] == NULL && !(map_terrain[xx][yy]==WALL))
 		{
-			return make_pair(xx,yy);
+			return std::make_pair(xx,yy);
 		}
 	}
-	return make_pair(-1,-1);
+	return std::make_pair(-1,-1);
 
 }
 
@@ -827,8 +827,8 @@ void item_to_location(item* a, int x, int y)
 	{
 		inv_remove(a);
 	}
-	pair<int,int> place_here = nearby_home_for_item(x,y);
-	if(place_here != make_pair(-1,-1))
+	std::pair<int,int> place_here = nearby_home_for_item(x,y);
+	if(place_here != std::make_pair(-1,-1))
 	{
 		map_items[place_here.first][place_here.second] = a;
 		a->x = place_here.first; a->y = place_here.second;
@@ -854,7 +854,7 @@ void device_to_inventory(item* a)
 
 }
 
-void add_junk(string name, string description, char ch, int colour, int x, int y)
+void add_junk(std::string name, std::string description, char ch, int colour, int x, int y)
 {
 	item* it = new item();
 	it->projection = NULL;
@@ -908,11 +908,11 @@ inline bool is_corner_b(int x,int y)
 	return false;
 }
 
-void make_room(pair<int,int> centre, pair<int,int> size)
+void make_room(std::pair<int,int> centre, std::pair<int,int> size)
 {
 	int x=centre.first;int y=centre.second;int xsize=size.first;int ysize=size.second;
-	vector<pair<int,int>> inner_walls;
-	vector<pair<int,int>> outer_walls;
+	std::vector<std::pair<int,int>> inner_walls;
+	std::vector<std::pair<int,int>> outer_walls;
 	for(int i=0;i<xsize+2;i++)
 	{
 		for(int j=0;j<ysize+2;j++)
@@ -923,7 +923,7 @@ void make_room(pair<int,int> centre, pair<int,int> size)
 				{
 					map_terrain[i+x-xsize/2][j+y-ysize/2] = WALL;
 					if(!is_corner_a(i,j,xsize+1,ysize+1))
-					{ outer_walls.push_back(make_pair(i+x-xsize/2,j+y-ysize/2)); }
+					{ outer_walls.push_back(std::make_pair(i+x-xsize/2,j+y-ysize/2)); }
 				}
 			}
 			else
@@ -934,14 +934,14 @@ void make_room(pair<int,int> centre, pair<int,int> size)
 				}
 				else if(!is_corner_b(i+x-xsize/2,j+y-ysize/2))
 				{
-					inner_walls.push_back(make_pair(i+x-xsize/2,j+y-ysize/2));
+					inner_walls.push_back(std::make_pair(i+x-xsize/2,j+y-ysize/2));
 				}
 			}
 		}
 	}
 	if(inner_walls.size()>0)
 	{
-		pair<int,int> inner_door_choice = inner_walls[rand()%inner_walls.size()];
+		std::pair<int,int> inner_door_choice = inner_walls[rand()%inner_walls.size()];
 		map_access[inner_door_choice.first+1][inner_door_choice.second] = true;
 		map_access[inner_door_choice.first-1][inner_door_choice.second] = true;
 		map_access[inner_door_choice.first][inner_door_choice.second+1] = true;
@@ -950,7 +950,7 @@ void make_room(pair<int,int> centre, pair<int,int> size)
 	}
 	if(outer_walls.size()>0)
 	{
-		pair<int,int> outer_door_choice = outer_walls[rand()%outer_walls.size()];
+		std::pair<int,int> outer_door_choice = outer_walls[rand()%outer_walls.size()];
 		map_terrain[outer_door_choice.first][outer_door_choice.second] = DOOR;
 		map_access[outer_door_choice.first+1][outer_door_choice.second] = true;
 		map_access[outer_door_choice.first-1][outer_door_choice.second] = true;
@@ -960,7 +960,7 @@ void make_room(pair<int,int> centre, pair<int,int> size)
 
 }
 
-pair<int,int> can_make_room(pair<int,int> xy,int xcentre,int ycentre)
+std::pair<int,int> can_make_room(std::pair<int,int> xy,int xcentre,int ycentre)
 {
 	int x=xy.first; int y = xy.second;
 	int xsize = rand()%5 + 3;
@@ -973,10 +973,10 @@ pair<int,int> can_make_room(pair<int,int> xy,int xcentre,int ycentre)
 	{
 		for(int j=0;j<ysize+2;j++)
 		{
-			if (!on_map(i+x-xsize/2,j+y-ysize/2)) {return make_pair(0,0);}
-			if (i+x-xsize/2 > xcentre+BUILDING_SIZE || i+x-xsize/2 < xcentre - BUILDING_SIZE) {return make_pair(0,0);}
-			if (j+y-ysize/2 > ycentre+BUILDING_SIZE || j+y-ysize/2 < ycentre - BUILDING_SIZE) {return make_pair(0,0);}
-			if(map_access[i+x-xsize/2][j+y-ysize/2]) {return make_pair(0,0);}
+			if (!on_map(i+x-xsize/2,j+y-ysize/2)) {return std::make_pair(0,0);}
+			if (i+x-xsize/2 > xcentre+BUILDING_SIZE || i+x-xsize/2 < xcentre - BUILDING_SIZE) {return std::make_pair(0,0);}
+			if (j+y-ysize/2 > ycentre+BUILDING_SIZE || j+y-ysize/2 < ycentre - BUILDING_SIZE) {return std::make_pair(0,0);}
+			if(map_access[i+x-xsize/2][j+y-ysize/2]) {return std::make_pair(0,0);}
 			if(i==0 || i == xsize+1 || j==0 || j==ysize+1)
 			{
 				if (map_terrain[i+x-xsize/2][j+y-ysize/2] == DIRT || map_terrain[i+x-xsize/2][j+y-ysize/2] == STREE || map_terrain[i+x-xsize/2][j+y-ysize/2] == BTREE)
@@ -1000,19 +1000,19 @@ pair<int,int> can_make_room(pair<int,int> xy,int xcentre,int ycentre)
 	}
 	if(inner_walls>0 && outer_walls > 0 && floors > 3)
 	{
-		return make_pair(xsize,ysize);
+		return std::make_pair(xsize,ysize);
 	}
-	return make_pair(0,0);
+	return std::make_pair(0,0);
 }
 
-pair<int,int> five_tries_to_make_room(pair<int,int> xy, int xcentre, int ycentre)
+std::pair<int,int> five_tries_to_make_room(std::pair<int,int> xy, int xcentre, int ycentre)
 {
 	for(int i=0;i<5;i++)
 	{
-		pair<int,int> ret = can_make_room(xy,xcentre, ycentre);
-		if(ret != make_pair(0,0)) return ret;
+		std::pair<int,int> ret = can_make_room(xy,xcentre, ycentre);
+		if(ret != std::make_pair(0,0)) return ret;
 	}
-	return make_pair(0,0);
+	return std::make_pair(0,0);
 }
 
 void draw_ship(int x,int y)
@@ -1143,11 +1143,11 @@ void init_map()
 				}
 			}
 		}
-		vector<pair<int,int>> room_centres;
-		room_centres.push_back(make_pair(xcentre,ycentre));
-		vector<pair<int,int>> room_sizes;
-		room_sizes.push_back(make_pair(rand()%5 + 2,rand()%5+2));
-		vector<int> fail_counts;
+		std::vector<std::pair<int,int>> room_centres;
+		room_centres.push_back(std::make_pair(xcentre,ycentre));
+		std::vector<std::pair<int,int>> room_sizes;
+		room_sizes.push_back(std::make_pair(rand()%5 + 2,rand()%5+2));
+		std::vector<int> fail_counts;
 		fail_counts.push_back(0);
 		make_room(room_centres[0],room_sizes[0]);
 		int successive_failures = 0;
@@ -1162,33 +1162,33 @@ void init_map()
 				continue;
 			}
 			int parent_choice = rand()%room_centres.size();
-			pair<int,int> parent_centre = room_centres[parent_choice];
-			pair<int,int> parent_size = room_sizes[parent_choice];
-			vector<pair<int,int>> centre_choices;
-			vector<pair<int,int>> size_choices;
+			std::pair<int,int> parent_centre = room_centres[parent_choice];
+			std::pair<int,int> parent_size = room_sizes[parent_choice];
+			std::vector<std::pair<int,int>> centre_choices;
+			std::vector<std::pair<int,int>> size_choices;
 			int choice_range_x = rand()%(x_size-2)+parent_size.first+2;
 			int choice_range_y = rand()%(y_size-2)+parent_size.second+2;
-			pair<int,int> candidate;
-			pair<int,int> candidate_size;
+			std::pair<int,int> candidate;
+			std::pair<int,int> candidate_size;
 			for(int x=0;x<choice_range_x;x++)
 			{
-				candidate=make_pair(x+parent_centre.first-choice_range_x/2,parent_centre.second-choice_range_y/2);
+				candidate=std::make_pair(x+parent_centre.first-choice_range_x/2,parent_centre.second-choice_range_y/2);
 				candidate_size = five_tries_to_make_room(candidate,xcentre,ycentre);
-				if(candidate_size != make_pair(0,0)) {centre_choices.push_back(candidate); size_choices.push_back(candidate_size);}
+				if(candidate_size != std::make_pair(0,0)) {centre_choices.push_back(candidate); size_choices.push_back(candidate_size);}
 
-				candidate=make_pair(x+parent_centre.first-choice_range_x/2,choice_range_y-1+parent_centre.second-choice_range_y/2);
+				candidate=std::make_pair(x+parent_centre.first-choice_range_x/2,choice_range_y-1+parent_centre.second-choice_range_y/2);
 				candidate_size = five_tries_to_make_room(candidate,xcentre,ycentre);
-				if(candidate_size != make_pair(0,0)) {centre_choices.push_back(candidate); size_choices.push_back(candidate_size);}
+				if(candidate_size != std::make_pair(0,0)) {centre_choices.push_back(candidate); size_choices.push_back(candidate_size);}
 			}
 			for(int y=1;y<choice_range_y;y++)
 			{
-				candidate = make_pair(parent_centre.first-choice_range_x/2,y+parent_centre.second-choice_range_y/2);
+				candidate = std::make_pair(parent_centre.first-choice_range_x/2,y+parent_centre.second-choice_range_y/2);
 				candidate_size = five_tries_to_make_room(candidate,xcentre,ycentre);
-				if(candidate_size != make_pair(0,0)) {centre_choices.push_back(candidate); size_choices.push_back(candidate_size);}
+				if(candidate_size != std::make_pair(0,0)) {centre_choices.push_back(candidate); size_choices.push_back(candidate_size);}
 
-				candidate=make_pair(parent_centre.first-choice_range_x/2+choice_range_x-1,y+parent_centre.second-choice_range_y/2);
+				candidate=std::make_pair(parent_centre.first-choice_range_x/2+choice_range_x-1,y+parent_centre.second-choice_range_y/2);
 				candidate_size = five_tries_to_make_room(candidate,xcentre,ycentre);
-				if(candidate_size != make_pair(0,0)) {centre_choices.push_back(candidate); size_choices.push_back(candidate_size);}
+				if(candidate_size != std::make_pair(0,0)) {centre_choices.push_back(candidate); size_choices.push_back(candidate_size);}
 			}
 			if(centre_choices.size() == 0 || size_choices.size() != centre_choices.size())
 			{
@@ -1231,7 +1231,7 @@ void init_map()
 
 void init_actors()
 {
-	pair<int,int> ploc = random_occupiable_square();
+	std::pair<int,int> ploc = random_occupiable_square();
 	ploc = random_occupiable_square();
 	p_ptr = add_actor(zoo[0],true,ship_x,ship_y);
 	for(int i=0;i<10;i++)
@@ -1266,12 +1266,12 @@ void update_device_desciption(item* dev)
 	if(dev->configuration == ON_TIMER)
 	{
 		sprintf(desc, ", %.1f seconds remaining.", (float)dev->time_remaining/10);
-		dev->description += string(desc);
+		dev->description += std::string(desc);
 	}
 	else if(dev->configuration == ON_REMOTE)
 	{
 		sprintf(desc, ", wavelength %d.", dev->wavelength+1);
-		dev->description += string(desc);
+		dev->description += std::string(desc);
 	}
 }
 
@@ -1399,7 +1399,7 @@ void init_items()
 	ammo[PISTOL] = 150;
 	ammo[RIFLE] = 300;
 	ammo[CANNON] = 30;
-	dev_inv = vector<vector<vector<item*>>>(DEVICE_TYPES,(vector<vector<item*>>(DEVICE_CONFIGURATIONS)));
+	dev_inv = std::vector<std::vector<std::vector<item*>>>(DEVICE_TYPES,(std::vector<std::vector<item*>>(DEVICE_CONFIGURATIONS)));
 	item* dev;
 	for(int i=0;i<5;i++)
 	{
@@ -1474,25 +1474,25 @@ inline void draw_ch(int x,int y,char ch, int col)
 	attron(COLOR_PAIR(col));
 	mvaddch(1+y-viewport_top_edge(),x-viewport_left_edge(),ch);
 }
-string walk_description(species* sp)
+std::string walk_description(species* sp)
 {
 	if(sp->walk_energy > human_sp->walk_energy) return "fast";
 	else if(sp->walk_energy < human_sp->walk_energy) return "slow";
 	return "avrg";
 }
-string run_description(species* sp)
+std::string run_description(species* sp)
 {
 	if(sp->run_energy > human_sp->run_energy) return "fast";
 	else if(sp->run_energy < human_sp->run_energy) return "slow";
 	return "avrg";
 }
-string damage_description(species* sp)
+std::string damage_description(species* sp)
 {
 	if(sp->damage <= 4) return "weak";
 	if(sp->damage <= 8) return "strg";
 	return "dngr";
 }
-string health_description(species* sp)
+std::string health_description(species* sp)
 {
 	if(sp->min_health <= 6) return "frail";
 	return "tough";
@@ -1503,9 +1503,9 @@ void draw_memory()
 	{
 		species* sp = zoo[i-9];
 		attron(COLOR_PAIR(sp->colour));
-		mvaddstr(i,viewport_width,string(1,sp->ch).c_str());
+		mvaddstr(i,viewport_width,std::string(1,sp->ch).c_str());
 		attron(COLOR_PAIR(COLOR_WHITE));
-		mvaddstr(i, viewport_width+2, (string(size_descriptors[sp->size])+" "+
+		mvaddstr(i, viewport_width+2, (std::string(size_descriptors[sp->size])+" "+
 			walk_description(sp)+" "+run_description(sp)+" "+damage_description(sp)+
 			" "+health_description(sp)).c_str());
 	}
@@ -1515,18 +1515,18 @@ void draw_stats()
 	attron(COLOR_PAIR(COLOR_WHITE));
 	for(int i=3;i<11+ZOO_SIZE;i++)
 	{
-		mvaddstr(i,viewport_width,string(disp_columns-viewport_width,' ').c_str());
+		mvaddstr(i,viewport_width,std::string(disp_columns-viewport_width,' ').c_str());
 	}
 	mvprintw(3,viewport_width,"HP: %d/%d %s    ",p_ptr->health,p_ptr->sspecies->min_health,
 		p_ptr->running?"running":"       ");
-	mvprintw(4,viewport_width,(string("     ")+
-		string(current_weapon==PISTOL?"________ ":"         ")+
-		string(current_weapon==RIFLE?"_______ ":"        ")+
-		string(current_weapon==CANNON?"________":"        ")).c_str());
+	mvprintw(4,viewport_width,(std::string("     ")+
+		std::string(current_weapon==PISTOL?"________ ":"         ")+
+		std::string(current_weapon==RIFLE?"_______ ":"        ")+
+		std::string(current_weapon==CANNON?"________":"        ")).c_str());
 	mvprintw(5,viewport_width,"Ammo X Pistol Y Rifle Z Cannon");
 	mvprintw(6,viewport_width,"          %3d     %3d       %2d",ammo[PISTOL],ammo[RIFLE],ammo[CANNON]);
 	mvprintw(7,viewport_width,"%10s %10s stamina",mode_text[current_mode],
-		string(10*p_ptr->stamina / p_ptr->sspecies->stamina,'*').c_str());
+		std::string(10*p_ptr->stamina / p_ptr->sspecies->stamina,'*').c_str());
 	mvprintw(8,viewport_width,"Devic LEx HEx Hol Noi Sce Brn");
 	mvprintw(9,viewport_width,"Count A%2d B%2d C%2d D%2d E%2d F%2d",
 		count_inv_devices(LOW_EXPLOSIVE),count_inv_devices(HIGH_EXPLOSIVE),
@@ -1614,7 +1614,7 @@ void draw_tile_description(int x, int y)
 {
 	for(int i=0;i<3;i++)
 	{
-		mvaddstr(i,viewport_width,string(disp_columns-viewport_width,' ').c_str());
+		mvaddstr(i,viewport_width,std::string(disp_columns-viewport_width,' ').c_str());
 	}
 	if (!map_seen[x][y] && !debug)
 	{
@@ -1648,7 +1648,7 @@ void draw_tile_description(int x, int y)
 void undraw_tile_description()
 {
 	for (int i=0;i<3;i++)
-	mvaddstr(i,viewport_width,string(disp_columns-viewport_width,' ').c_str());
+	mvaddstr(i,viewport_width,std::string(disp_columns-viewport_width,' ').c_str());
 }
 
 char scent_strength(float scent)
@@ -1825,10 +1825,10 @@ void draw(bool record_actors=false)
 {
 	draw_stats();
 	draw_tile_description(p_ptr->x,p_ptr->y);
-	centre_x = min(p_ptr->x,MAP_SIZE - viewport_width/2);
-	centre_x = max(centre_x,viewport_width/2);
-	centre_y = min(p_ptr->y,MAP_SIZE - viewport_height/2);
-	centre_y = max(centre_y,viewport_height/2);
+	centre_x = std::min(p_ptr->x,MAP_SIZE - viewport_width/2);
+	centre_x = std::max(centre_x,viewport_width/2);
+	centre_y = std::min(p_ptr->y,MAP_SIZE - viewport_height/2);
+	centre_y = std::max(centre_y,viewport_height/2);
 	for(int x=viewport_left_edge();x<viewport_right_edge(); x++)
 	{
 		for(int y=viewport_top_edge();y<viewport_bottom_edge(); y++)
@@ -1873,10 +1873,10 @@ void draw_info(int x,int y)
 {
 	current_mode = INFO_MODE;
 	draw_stats();
-	string s;
+	std::string s;
 	//for(int i = 0; y<10; y++)
 	//{
-	//	mvaddstr(i,0,string(viewport_width,' ').c_str());
+	//	mvaddstr(i,0,std::string(viewport_width,' ').c_str());
 	//}
 	if(map_items[x][y] != NULL)
 	{
@@ -2030,14 +2030,14 @@ bool fire_weapon(int x1, int y1, int x2, int y2)
 
 void scent_walk(actor* a)
 {
-	pair<int,int> valid_dirs[8];
+	std::pair<int,int> valid_dirs[8];
 	int dir_count = 0;
 	int best_x = 0; int best_y = 0;
 	float best_scent = map_human_scent[a->x][a->y];
 	random_shuffle(vdirections.begin(),vdirections.end());
 	for(int d=0;d<8;d++)
 	{
-		pair<int,int> dir = directions[d];
+		std::pair<int,int> dir = directions[d];
 		if(!terrain_immovable(a,a->x+dir.first,a->y+dir.second))
 		{
 			float detect = map_human_scent[a->x+dir.first][a->y+dir.second] + randfloat()*map_human_scent[a->x][a->y]*0.001f;
@@ -2053,11 +2053,11 @@ void scent_walk(actor* a)
 
 void random_walk(actor* a)
 {
-	pair<int,int> valid_dirs[8];
+	std::pair<int,int> valid_dirs[8];
 	int dir_count = 0;
 	for(int d=0;d<8;d++)
 	{
-		pair<int,int> dir = directions[d];
+		std::pair<int,int> dir = directions[d];
 		if(is_wall(a->x+dir.first,a->y+dir.second))
 		{
 			valid_dirs[dir_count] = dir;
@@ -2130,7 +2130,7 @@ void ai_turn(actor* a)
 	int bestdx = 0; int bestdy = 0;
 	for(int d=0;d<8;d++)
 	{
-		pair<int,int> dir = directions[d];
+		std::pair<int,int> dir = directions[d];
 		int ddx = dir.first; int ddy = dir.second;
 		if (!terrain_immovable(a,a->x+ddx,a->y+ddy))
 		{
@@ -2171,8 +2171,8 @@ void update_map_seen()
 	}
 }
 
-string signal_strength(int x,int y)
-{string ss = "The radio signal is ";
+std::string signal_strength(int x,int y)
+{std::string ss = "The radio signal is ";
 	int d2 = d22(x,y,target_x,target_y);
 	if((float)sqrt((float)d2) < 9+rand()%3)
 		return ss+ "coming from very close by!";
@@ -2191,12 +2191,12 @@ int select_device()
 {
 	attron(COLOR_PAIR(COLOR_WHITE));
 	mvaddstr(0,0, padmsg("Which kind of device? Q, q or ESC to cancel.").c_str());
-	mvaddstr(1,0, padmsg(string(count_inv_devices(LOW_EXPLOSIVE)?"a. Low explosive, ":"") +
-		string(count_inv_devices(HIGH_EXPLOSIVE)?"b. High explosive, ":"")).c_str());
-	mvaddstr(2,0,padmsg(string(count_inv_devices(HOLOGRAM_PROJECTOR)?"c. Hologram projector,":"")+
-		string(count_inv_devices(NOISE_GENERATOR)?"d. Noise generator, ":"")).c_str());
-	mvaddstr(3,0,padmsg(string(count_inv_devices(SCENT_GENERATOR)?"e. Scent generator, ":"")+
-		string(count_inv_devices(BRAIN_SLICE)?"f. Brain slice":"")).c_str());
+	mvaddstr(1,0, padmsg(std::string(count_inv_devices(LOW_EXPLOSIVE)?"a. Low explosive, ":"") +
+		std::string(count_inv_devices(HIGH_EXPLOSIVE)?"b. High explosive, ":"")).c_str());
+	mvaddstr(2,0,padmsg(std::string(count_inv_devices(HOLOGRAM_PROJECTOR)?"c. Hologram projector,":"")+
+		std::string(count_inv_devices(NOISE_GENERATOR)?"d. Noise generator, ":"")).c_str());
+	mvaddstr(3,0,padmsg(std::string(count_inv_devices(SCENT_GENERATOR)?"e. Scent generator, ":"")+
+		std::string(count_inv_devices(BRAIN_SLICE)?"f. Brain slice":"")).c_str());
 	bool unacceptable = true;
 	int device_num;
 	int kp;
@@ -2223,7 +2223,7 @@ int select_configuration(int dev_type)
 {
 	attron(COLOR_PAIR(COLOR_WHITE));
 	mvaddstr(0,0,padmsg("Use a preconfigured device? Q, q or ESC to cancel.").c_str());
-	mvaddstr(1,0,string(viewport_width,' ').c_str());
+	mvaddstr(1,0,std::string(viewport_width,' ').c_str());
 	mvprintw(1,0,"(a) %d unconfigured, (b) %d on timer, (c) %d on remote",dev_inv[dev_type][UNCONFIGURED].size(),
 		dev_inv[dev_type][ON_TIMER].size(),dev_inv[dev_type][ON_REMOTE].size());
 	
@@ -2249,7 +2249,7 @@ int select_configuration(int dev_type)
 item* select_individual_device_from_type_and_config(int type, int config)
 {
 	bool unacceptable = true;
-	vector<item*>* options = &dev_inv[type][config];
+	std::vector<item*>* options = &dev_inv[type][config];
 	attron(COLOR_PAIR(COLOR_WHITE));
 	for(unsigned int i=0;i<options->size();i++)
 	{
@@ -2550,21 +2550,21 @@ void player_turn(actor* a)
 				switch(kpp)
 				{
 				case KEY_UP: case 'k':
-					ly = max(ly-1,viewport_top_edge()); break;
+					ly = std::max(ly-1,viewport_top_edge()); break;
 				case KEY_DOWN: case 'j':
-					ly = min(ly+1,viewport_bottom_edge()); break;
+					ly = std::min(ly+1,viewport_bottom_edge()); break;
 				case KEY_LEFT: case 'h':
-					lx = max(lx-1,viewport_left_edge()); break;
+					lx = std::max(lx-1,viewport_left_edge()); break;
 				case KEY_RIGHT: case 'l':
-					lx = min(lx+1,viewport_right_edge()); break;
+					lx = std::min(lx+1,viewport_right_edge()); break;
 				case 'y':
-					lx = max(lx-1,viewport_left_edge()); ly = max(ly-1,viewport_top_edge()); break;
+					lx = std::max(lx-1,viewport_left_edge()); ly = std::max(ly-1,viewport_top_edge()); break;
 				case 'u':
-					lx = min(lx+1,viewport_right_edge()); ly = max(ly-1,viewport_top_edge()); break;
+					lx = std::min(lx+1,viewport_right_edge()); ly = std::max(ly-1,viewport_top_edge()); break;
 				case 'b':
-					lx = max(lx-1,viewport_left_edge()); ly = min(ly+1,viewport_bottom_edge()); break;
+					lx = std::max(lx-1,viewport_left_edge()); ly = std::min(ly+1,viewport_bottom_edge()); break;
 				case 'n':
-					lx = min(lx+1,viewport_right_edge()); ly = min(ly+1,viewport_bottom_edge()); break;
+					lx = std::min(lx+1,viewport_right_edge()); ly = std::min(ly+1,viewport_bottom_edge()); break;
 				case 't':
 					{
 						if(los_exists(p_ptr->x,p_ptr->y,lx,ly))
@@ -2631,21 +2631,21 @@ void player_turn(actor* a)
 					}
 					break;
 				case KEY_UP: case 'k':
-					ly = max(ly-1,viewport_top_edge()); break;
+					ly = std::max(ly-1,viewport_top_edge()); break;
 				case KEY_DOWN: case 'j':
-					ly = min(ly+1,viewport_bottom_edge()); break;
+					ly = std::min(ly+1,viewport_bottom_edge()); break;
 				case KEY_LEFT: case 'h':
-					lx = max(lx-1,viewport_left_edge()); break;
+					lx = std::max(lx-1,viewport_left_edge()); break;
 				case KEY_RIGHT: case 'l':
-					lx = min(lx+1,viewport_right_edge()); break;
+					lx = std::min(lx+1,viewport_right_edge()); break;
 				case 'y':
-					lx = max(lx-1,viewport_left_edge()); ly = max(ly-1,viewport_top_edge()); break;
+					lx = std::max(lx-1,viewport_left_edge()); ly = std::max(ly-1,viewport_top_edge()); break;
 				case 'u':
-					lx = min(lx+1,viewport_right_edge()); ly = max(ly-1,viewport_top_edge()); break;
+					lx = std::min(lx+1,viewport_right_edge()); ly = std::max(ly-1,viewport_top_edge()); break;
 				case 'b':
-					lx = max(lx-1,viewport_left_edge()); ly = min(ly+1,viewport_bottom_edge()); break;
+					lx = std::max(lx-1,viewport_left_edge()); ly = std::min(ly+1,viewport_bottom_edge()); break;
 				case 'n':
-					lx = min(lx+1,viewport_right_edge()); ly = min(ly+1,viewport_bottom_edge()); break;
+					lx = std::min(lx+1,viewport_right_edge()); ly = std::min(ly+1,viewport_bottom_edge()); break;
 				case 'f':
 					if(ammo[current_weapon] == 0)
 					{add_message("Can't fire this weapon, no ammo.");draw_last_msg();}
@@ -2700,7 +2700,7 @@ void diffuse_scent_human()
 				int count = 1;
 				for(int d=0;d<8;d++)
 				{
-					pair<int,int> dir = directions[d];
+					std::pair<int,int> dir = directions[d];
 					int xx = x+dir.first; int yy = y+dir.second;
 					if(!is_wall(xx,yy))
 					{
@@ -2716,7 +2716,7 @@ void diffuse_scent_human()
 
 int play_turn()
 {
-		for(vector<actor*>::iterator a = actors.begin(); a != actors.end(); ++a)
+		for(std::vector<actor*>::iterator a = actors.begin(); a != actors.end(); ++a)
 		{
 			actor* act = (*a);
 			if (act->sspecies->name == "human" && !act->is_player && !act->is_hologram)
@@ -2729,8 +2729,8 @@ int play_turn()
 				if(act->running)
 				{
 					int stamina_consumed = (act->stamina * (act->sspecies->run_energy - act->sspecies->walk_energy))/act->sspecies->stamina;
-					act->energy += min(stamina_consumed,act->stamina);
-					act->stamina -=  min(stamina_consumed,act->stamina);
+					act->energy += std::min(stamina_consumed,act->stamina);
+					act->stamina -=  std::min(stamina_consumed,act->stamina);
 					if (stamina_consumed == 0)
 					{
 						if(act->is_player)
@@ -2743,7 +2743,7 @@ int play_turn()
 				else if(act->energy > 100)
 				{
 					act->stamina += act->sspecies->stamina/70;
-					act->stamina = min(act->stamina,act->sspecies->stamina);
+					act->stamina = std::min(act->stamina,act->sspecies->stamina);
 				}
 				if (act->is_player)
 				{
@@ -2759,7 +2759,7 @@ int play_turn()
 						act->most_noticeable_sound = 0.0;
 						sound_this_turn = "";
 						dir_this_turn = "";
-						act->sound_threshold = max(act->sound_threshold-act->sspecies->hearing_adapt,act->sspecies->hearing_thres);
+						act->sound_threshold = std::max(act->sound_threshold-act->sspecies->hearing_adapt,act->sspecies->hearing_thres);
 
 						visible_actors.clear();
 					}
@@ -2768,7 +2768,7 @@ int play_turn()
 						map_human_scent[act->x][act->y] += 1000.0;
 						diffuse_scent_human();
 					}
-					for(vector<item*>::iterator dev = timer_devices.begin(); dev != timer_devices.end();)
+					for(std::vector<item*>::iterator dev = timer_devices.begin(); dev != timer_devices.end();)
 					{
 						if((*dev)->time_remaining > 0)
 						{
@@ -2790,27 +2790,27 @@ int play_turn()
 							dev = timer_devices.erase(dev);
 						}
 					}
-					for(vector<item*>::iterator dev = active_devices.begin(); dev != active_devices.end(); ++dev)
+					for(std::vector<item*>::iterator dev = active_devices.begin(); dev != active_devices.end(); ++dev)
 					{
 						if((*dev)->device_type == SCENT_GENERATOR)
 						{
 							map_human_scent[(*dev)->x][(*dev)->y] += ((*dev)->power_remaining*1200)/100;
 							if(rand()%7 < 2) (*dev)->power_remaining -= 1;
-							(*dev)->power_remaining = max(0,(*dev)->power_remaining);
+							(*dev)->power_remaining = std::max(0,(*dev)->power_remaining);
 						}
 						if((*dev)->device_type == HOLOGRAM_PROJECTOR)
 						{
 							;
 						}
 					}
-					for(vector<item*>::iterator dev = explode_this_turn.begin(); dev != explode_this_turn.end(); ++dev)
+					for(std::vector<item*>::iterator dev = explode_this_turn.begin(); dev != explode_this_turn.end(); ++dev)
 					{
 						set_unconfigured(*dev);
 						//remove(timer_devices.begin(),timer_devices.end(),*dev);
 						activate_device(*dev);
 					}
 					explode_this_turn.erase(explode_this_turn.begin(),explode_this_turn.end());
-					for(vector<explosion>::iterator ex = explosions_this_turn.begin(); ex != explosions_this_turn.end(); ex++)
+					for(std::vector<explosion>::iterator ex = explosions_this_turn.begin(); ex != explosions_this_turn.end(); ex++)
 					{
 						do_explosion(*ex);
 					}
@@ -2832,14 +2832,14 @@ int play_turn()
 						act->energy -= 100;
 						ai_turn(act);
 						act->most_noticeable_sound = 0.0;
-						act->sound_threshold = max(act->sound_threshold-act->sspecies->hearing_adapt,act->sspecies->hearing_thres);
+						act->sound_threshold = std::max(act->sound_threshold-act->sspecies->hearing_adapt,act->sspecies->hearing_thres);
 					}
 				}
 			}
 		}
 		if(rand()%4000+150+turn_count >4000 && rand()%70 == 0)
 		{
-			pair<int,int> loc = random_occupiable_square();
+			std::pair<int,int> loc = random_occupiable_square();
 
 			add_actor(zoo[rand()%ZOO_SIZE+1],false,loc.first,loc.second);
 		}
