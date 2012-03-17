@@ -10,10 +10,15 @@
 
 #pragma warning(disable: 4996)
 /*
+allowable polish TODO:
+'?' for more help, mac binary, check that killed cursor is compatible with mac, kill the crash
+
+*/
+
+/*
 REAL TODO
-make critical hits, decrease ammo
+make critical hits
 make graduated sensitivity to smell, make alternatives for smell generator, 
-make brain slice,
 make blinding lights
 make remotes
 allow pickup, drop, hide, activate
@@ -144,12 +149,13 @@ int ship_y;
 const char* const transmission[] = {"Please enjoy your stay!",
 	"Toilets are situated on every floor!",
 	"Please visit again!",
-	"Barnacle your ship for free at the drydock... just kidding!",
+	"Debarnacle your ship for free at the drydock... just kidding!",
 	"The art gallery ship IDF Fuseli is currently docked at Bay 12. Visiting charge is 69,125 Zorkmids.",
 	"Please remember to take all your luggage and personal belongings with you when leaving the spaceport.",
 	"... are you there? Can you help me?",
 	"Isn't it such a beautiful day? I love it when that nebula does that thing with the sun... Hey, why not buy some stuff?",
-	"If you want to buy some stuff, why not get lost in the mall for a few days?"
+	"If you want to buy some stuff, why not get lost in the mall for a few days?",
+	"testabcdefghijklmnopqrstuvwxyzaabbccddeeffgghhiijjkkllmmnnooppqqrrssttuuvvwwxxyyzztteesstttestabcdefghijklmnopqrstuvwxyzaabbccddeeffgghhiijjkkllmmnnooppqqrrssttuuvvwwxxyyzztteesstt"
 };
 std::vector<std::string> vtransmission(transmission,arrayend(transmission));
 
@@ -201,6 +207,81 @@ void add_message(std::string msg)
 	//return 0;
 }
 
+void pretty_print(std::string s)
+{
+	attron(COLOR_PAIR(COLOR_WHITE));
+	int current_line = 0;
+	std::string line_so_far = "";
+	std::string word_so_far = "";
+	for(unsigned int i = 0; i<s.length();i++)
+	{
+		
+		if(i == s.length()-1)
+		{
+			word_so_far += s[i];
+			if(line_so_far.length() + word_so_far.length()+1 > viewport_width)
+			{
+				mvaddstr(current_line,0,(line_so_far+std::string(viewport_width-line_so_far.length(),' ')).c_str());
+				mvaddstr(current_line+1,0,(word_so_far+std::string(viewport_width-word_so_far.length(),' ')).c_str());
+				return;
+			}
+			else
+			{
+				line_so_far += " " + word_so_far;
+				mvaddstr(current_line,0,(line_so_far+std::string(viewport_width-line_so_far.length(),' ')).c_str());
+				return;
+			}
+		}
+		else if(word_so_far.length() == viewport_width-1)
+		{
+			if(line_so_far.length())
+			{
+			mvaddstr(current_line,0,(line_so_far+std::string(viewport_width-line_so_far.length(),' ')).c_str());
+			current_line++;
+			line_so_far = "";
+			}
+			mvaddstr(current_line,0,(word_so_far + s[i]).c_str());
+			current_line++;
+			word_so_far = "";
+		}
+		else if(s[i] == ' ')
+		{
+			if(line_so_far.length() + word_so_far.length()+1 > viewport_width)
+			{
+				mvaddstr(current_line,0,(line_so_far+std::string(viewport_width-line_so_far.length(),' ')).c_str());
+				line_so_far = word_so_far;
+				word_so_far = "";
+				current_line++;
+			}
+			else
+			{
+				line_so_far += " " + word_so_far;
+				word_so_far = "";
+			}
+		}
+		else if(s[i] == '\n')
+		{
+			if(line_so_far.length() + word_so_far.length() +1> viewport_width)
+			{
+				mvaddstr(current_line,0,(line_so_far+std::string(viewport_width-line_so_far.length(),' ')).c_str());
+				line_so_far = word_so_far;
+				word_so_far = "";
+			}
+			else
+			{
+				line_so_far += word_so_far;
+				word_so_far = "";
+				mvaddstr(current_line,0,(line_so_far+std::string(viewport_width-line_so_far.length(),' ')).c_str());
+			}
+			current_line++;
+		}
+		else
+		{
+			word_so_far += s[i];
+		}
+	}
+}
+
 void draw_text_wodge(std::string s)
 {
 	int lines = (int)ceil(((float)s.length())/viewport_width);
@@ -221,7 +302,7 @@ void draw_last_msg()
 	{
 		s += rlmessages[i]; s += " ";
 	}
-	draw_text_wodge(s);
+	pretty_print(s);
 	last_message_seen = std::max(last_message_seen,(int)rlmessages.size()-2);
 	//mvaddstr(0,0,padmsg(rlmessages.back()).c_str());
 }
@@ -1533,6 +1614,7 @@ void init()
 	}
 	noecho();
 	cbreak();
+	curs_set(0);
 	keypad(stdscr,TRUE);
 	mvaddstr(5,5,"Choose a difficulty level (0 to 9):");
 	move(6,15);
@@ -1556,7 +1638,7 @@ void init()
 		target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
 		if(rand()%4 != 0) acceptable_range--;
 	}
-	add_junk("radio transmitter","So this is what's been causing you so much trouble!",'?',COLOR_BLUE,target_x,target_y);
+	add_junk("radio transmitter","So this is what's been causing you so much trouble!",'?',COLOR_CYAN,target_x,target_y);
 }
 
 
@@ -1616,6 +1698,7 @@ void draw_memory()
 void draw_stats()
 {
 	attron(COLOR_PAIR(COLOR_WHITE));
+
 	//for(int i=3;i<11+ZOO_SIZE;i++)
 	//{
 	//	mvaddstr(i,viewport_width+1,std::string(disp_columns-viewport_width-1,' ').c_str());
@@ -1623,20 +1706,32 @@ void draw_stats()
 	clear_area(viewport_width+1,3,disp_columns-viewport_width-1,8+ZOO_SIZE);
 	mvprintw(3,(viewport_width+1),"HP: %d/%d %s    ",p_ptr->health,p_ptr->sspecies->min_health,
 		p_ptr->running?"running":"       ");
-	mvprintw(4,(viewport_width+1),(std::string("     ")+
+	/*mvprintw(4,(viewport_width+1),(std::string("     ")+
 		std::string(current_weapon==PISTOL?"________ ":"         ")+
 		std::string(current_weapon==RIFLE?"_______ ":"        ")+
-		std::string(current_weapon==CANNON?"________":"        ")).c_str());
-	mvprintw(5,(viewport_width+1),"Ammo X Pistol Y Rifle Z Cannon");
+		std::string(current_weapon==CANNON?"________":"        ")).c_str());*/
+	mvprintw(5,(viewport_width+1),"Ammo ");
+	if(current_weapon == PISTOL) attron(COLOR_PAIR(COLOR_YELLOW)); else attron(COLOR_PAIR(COLOR_WHITE));
+	mvprintw(5,(viewport_width+1+5),"X Pistol ");
+		if(current_weapon == RIFLE) attron(COLOR_PAIR(COLOR_YELLOW)); else attron(COLOR_PAIR(COLOR_WHITE));
+	mvprintw(5,(viewport_width+1+5+9),"Y Rifle ");
+	if(current_weapon == CANNON) attron(COLOR_PAIR(COLOR_YELLOW)); else attron(COLOR_PAIR(COLOR_WHITE));
+	mvprintw(5,(viewport_width+1+5+9+8),"Z Cannon");
+	attron(COLOR_PAIR(COLOR_WHITE));
+
 	mvprintw(6,(viewport_width+1),"          %3d     %3d       %2d",ammo[PISTOL],ammo[RIFLE],ammo[CANNON]);
-	mvprintw(7,(viewport_width+1),"%10s %10s stamina",mode_text[current_mode],
-		std::string(10*p_ptr->stamina / p_ptr->sspecies->stamina,'*').c_str());
+	mvprintw(7,(viewport_width+1),"%10s ",mode_text[current_mode]);
+	attron(COLOR_PAIR(COLOR_BLUE));
+	printw(std::string(10-(10*p_ptr->stamina / p_ptr->sspecies->stamina),'*').c_str());
+	attron(COLOR_PAIR(COLOR_WHITE));
+	printw("%s stamina", std::string(10*p_ptr->stamina / p_ptr->sspecies->stamina,'*').c_str());
 	mvprintw(8,(viewport_width+1),"Devic LEx HEx Hol Noi Sce Brn");
 	mvprintw(9,(viewport_width+1),"Count A%2d B%2d C%2d D%2d E%2d F%2d",
 		count_inv_devices(LOW_EXPLOSIVE),count_inv_devices(HIGH_EXPLOSIVE),
 		count_inv_devices(HOLOGRAM_PROJECTOR),count_inv_devices(NOISE_GENERATOR),
 		count_inv_devices(SCENT_GENERATOR),count_inv_devices(BRAIN_SLICE));
 	mvprintw(10+ZOO_SIZE,(viewport_width+1),(sound_this_turn+(sound_this_turn!=""?" from ":"")+dir_this_turn).c_str());
+	mvprintw(12+ZOO_SIZE,viewport_width+3,"Press ? for help.");
 	draw_memory();
 }
 
@@ -1809,14 +1904,23 @@ void draw_tile(int x, int y,bool record_actors = false)
 void draw_line(int x1, int y1, int x2, int y2, char ch)
 {
     // if x1 == x2 or y1 == y2, then it does not matter what we set here
+	int col = COLOR_BLUE;
+	if(on_map(x2,y2))
+	{
+		if(map_occupants[x2][y2] != NULL)
+		{
+			col = COLOR_CYAN;
+		}
+	}
     int delta_x(x2 - x1);
     signed char ix((delta_x > 0) - (delta_x < 0));
     delta_x = std::abs(delta_x) << 1;
+
  
     int delta_y(y2 - y1);
     signed char iy((delta_y > 0) - (delta_y < 0));
     delta_y = std::abs(delta_y) << 1;
-	int col = COLOR_BLUE;
+
  
     if (delta_x >= delta_y)
     {
@@ -1931,7 +2035,7 @@ void undraw_line(int x1, int y1, int x2, int y2)
 bool nearer_actor (actor* a,actor* b)
 { return (d22(a->x,a->y,p_ptr->x,p_ptr->y)<d22(b->x,b->y,p_ptr->x,p_ptr->y)); }
 
-void draw(bool record_actors=false)
+void draw_scene(bool record_actors=false)
 {
 	
 	draw_tile_description(p_ptr->x,p_ptr->y);
@@ -2012,9 +2116,9 @@ void draw_info(int x,int y)
 	if(map_occupants[x][y] != NULL)
 	//mvprintw(0,0,map_occupants[x][y]->sspecies->description.c_str());
 	s += map_occupants[x][y]->sspecies->description;
-	draw_text_wodge(s);
+	pretty_print(s);
 	getch();
-	draw();
+	draw_scene();
 }
 
 inline bool in_vis_range(int x, int y, int xx, int yy)
@@ -2035,7 +2139,7 @@ void kill_actor(actor* a)
 void lose()
 {
 	add_message("You die. Press 'Q' to quit.");
-	draw();
+	draw_scene();
 	int kp = 0;
 	while(kp != 'Q') kp = fgetch();
 	endwin();
@@ -2046,7 +2150,7 @@ void win()
 {
 	map_terrain[ship_x+2][ship_y] = NS;
 	add_message("You close the doors and fly away! Press Q to quit.");
-	draw();
+	draw_scene();
 	int kp = 0;
 	while(kp != 'Q') kp = fgetch();
 	endwin();
@@ -2388,8 +2492,7 @@ std::string signal_receive(int x,int y)
 	if(target_x==-500) return "The radio transmitter is destroyed. Home time!";
 	std::string ss = vtransmission[rand()%vtransmission.size()];
 	float d2 = sqrt((float)d22(x,y,target_x,target_y));
-	float signal = squaref(1.0f + ((float)10 - d2) /
-			(float)(100 - 10));
+	float signal = squaref(1.0f + ((float)10 - d2) /90.0f);
 	std::string tt = "";
 	for(unsigned int i=0;i<ss.length();i++)
 		tt += (randfloat()<signal)?ss[i]:'*';
@@ -2425,7 +2528,7 @@ int select_device()
 				unacceptable = false;
 		}
 	}
-	draw();
+	draw_scene();
 	return device_num;
 }
 
@@ -2453,7 +2556,7 @@ int select_configuration(int dev_type)
 			config = -1; unacceptable = false;
 		}
 	}
-	draw();
+	draw_scene();
 	return config;
 }
 
@@ -2473,7 +2576,7 @@ item* select_individual_device_from_type_and_config(int type, int config)
 	{
 		unacceptable = false;
 	}
-	draw();
+	draw_scene();
 	return (*options)[kp-'a'];
 }
 
@@ -2494,7 +2597,7 @@ int ask_for_time()
 			t = kp - '0';
 		}
 	}
-	draw();
+	draw_scene();
 	return t*10;
 }
 
@@ -2529,7 +2632,7 @@ int ask_for_wavelength()
 			w = kp - '1';
 		}
 	}
-	draw();
+	draw_scene();
 	return w;
 }
 
@@ -2612,7 +2715,7 @@ bool reconfigure(item* a)
 		if(a->configuration != ON_REMOTE)
 		{s += std::string(" (c) use a remote control instead");}
 		s += ".";
-		draw_text_wodge(s);
+		pretty_print(s);
 		/*clear_area(0,0,viewport_width,5);
 		mvaddstr(0,0,a->description.c_str());
 		mvprintw(1,0,"Reconfigure? Space or (%c) to leave unchanged",a->configuration +'a');
@@ -2633,7 +2736,7 @@ bool reconfigure(item* a)
 			mvprintw(i,0,"(c) use a remote control instead");
 		}*/
 		int kp = fgetch();
-		draw();
+		draw_scene();
 		if(kp == 'q' || kp == 'Q' || kp == KEY_ESC)
 		{
 			unacceptable = false;
@@ -2650,7 +2753,7 @@ bool reconfigure(item* a)
 		}
 		else if( kp == 'b')
 		{
-			draw();
+			draw_scene();
 			int t = ask_for_time();
 			
 			if (t >= 0)
@@ -2661,7 +2764,7 @@ bool reconfigure(item* a)
 		}
 		else if (kp == 'c')
 		{
-			draw();
+			draw_scene();
 			int w = ask_for_wavelength();
 			if(w>=0)
 			{
@@ -2670,7 +2773,7 @@ bool reconfigure(item* a)
 			}
 		}
 	}
-	draw();
+	draw_scene();
 	return cancel;
 }
 
@@ -2740,7 +2843,7 @@ item* select_individual_device()
 void player_turn(actor* a)
 {
 	update_map_seen();
-	draw(true);
+	draw_scene(true);
 	int turn = -1;
 	while(turn)
 	{
@@ -2765,6 +2868,72 @@ void player_turn(actor* a)
 			turn = move_actor(a,1,1); break;
 		case '.':
 			turn = 0; break;
+		case '?':
+			{
+				int kp = '?';
+				int page = 0;
+				while(kp == '?')
+				{
+					switch(page)
+				{
+					case 4:
+					page = 0;
+					case 0:
+				pretty_print
+				(
+				/*"01234567890123456789012345678901234567890123456789"*/
+				  "Movement: y/7  k/8  u/9  Fire:             f      "
+				  "hjklyubn     \\  |  /     Throw:            t      "
+				  "42867913      \\ | /      Run:              R      "
+				  "          h/4--5/.--l/6  Check radio:      r      "
+				  "              / | \\      Wield pistol      X      "
+				  "             /  |  \\     Wield rifle       Y      "
+				  "          b/1  j/2  n/3  Wield cannon      Z      "
+				  "               fire or //Autotarget:     tab      "
+				  "               throw   ||Manual target: movement  "
+				  "               mode    \\\\Info on tile:     i      "
+				  "                                                  "
+				  "        Press ? again for more info.              "
+				  "   You might also want to read the README.        "
+				); break;
+				case 1:
+				pretty_print
+					(
+				  /*"01234567890123456789012345678901234567890123456789"*/
+				  "Your resources: You have three guns: a pistol, an assault rifle, and a plasma cannon. "
+				  "They are presented in order of power, but you have limited ammunition. "
+				  "You can wield them using X, Y, and Z. "
+				  "The plasma cannon causes explosions, so try not to get caught in the blast. "
+				  "You have various throwable devices to help you against the alien onslaught. "
+				  "There are two types of explosives, low power (a) and high power (b). "
+				  "There are also hologram projectors (c), noise generators (d), "
+				  "scent generators (e), and brain slices (f). "
+				  "These will distract enemies that are sensitive to light, sound, smell, or brain waves, respectively. "
+				  "When you throw them, you can set a timer from 0 to 9, so that they activate immediately or after you've taken that number of steps at walking speed."
+				  "                                    Press ? again for more info.     "
+
+					);break;
+				case 2: pretty_print
+			(
+			"You've never seen these aliens before, so you don't know how dangerous they are. As you observe them, you will record your findings in the status panel. "
+			"The first column isthe creature's symbol, the second is its size (small, medium, or huge), the third is its walking speed (faster or slower than your walk), "
+			"the fourth is its maximum running speed (faster or slower than your maximum running speed), the fifth is its damage (weak, strong, or dangerous), "
+			" and the sixth is its health (frail or tough - frail creatures are very easy to kill, and some tough creatures may die to just a few rifle bursts)."
+			"                                    Press ? again for more info.                         "
+			);break;
+				case 3:
+					pretty_print
+			(
+			"Your ship is claiming, despite the surrounding trees and hostile aliens, to be safely docked at a space station. You need to fix "
+			"this malfunction so that you can get off this planet. The ship uses automated radio signals to dock, so there must be a radio transmitter here. "
+			"You can use your portable radio to try to find the source of the transmissions, then disable it with explosives and escape."
+			"                                          Press ? again for more info.                 "
+			);break;
+				}
+				page++;
+				kp = fgetch();draw_scene();
+				}
+			}break;
 		case 'X':
 			if(current_weapon != PISTOL) {turn = 0; add_message("You wield your pistol."); current_weapon = PISTOL;} break;
 		case 'Y':
@@ -2783,8 +2952,18 @@ void player_turn(actor* a)
 		case 't':
 			{
 				current_mode = THROW_MODE;
-				draw();
+				draw_scene();
 				int lx = p_ptr->x; int ly = p_ptr->y;
+				if(current_target == NULL) current_target = p_ptr;
+				if(symmetrical_los(current_target->x,current_target->y,p_ptr->x,p_ptr->y))
+				{
+				lx = current_target->x; ly = current_target->y;
+				}
+				else
+				{
+					lx = p_ptr->x; ly = p_ptr->y;
+				}
+				int tab_ind = -1;
 			while(current_mode==THROW_MODE)
 			{
 				draw_tile_description(lx,ly);
@@ -2794,6 +2973,14 @@ void player_turn(actor* a)
 				undraw_tile_description();
 				switch(kpp)
 				{
+				case '\t':
+					if(visible_actors.size() > 0)
+					{
+						tab_ind = (tab_ind + 1)%visible_actors.size();
+						lx = visible_actors[tab_ind]->x;
+						ly = visible_actors[tab_ind]->y;
+					}
+					break;
 				case KEY_UP: case 'k':
 					ly = std::max(ly-1,viewport_top_edge()); break;
 				case KEY_DOWN: case 'j':
@@ -2832,7 +3019,7 @@ void player_turn(actor* a)
 					}
 					break;
 				case KEY_ESC:
-					 current_mode = WALK_MODE; draw(); break;
+					 current_mode = WALK_MODE; draw_scene(); break;
 				case 'i':
 					draw_info(lx,ly);
 					current_mode = THROW_MODE; draw_stats();
@@ -2845,7 +3032,7 @@ void player_turn(actor* a)
 		case 'f':
 		{
 			current_mode = FIRE_MODE;
-			draw();
+			draw_scene();
 			int lx,ly;
 			if(current_target == NULL) current_target = p_ptr;
 			if(symmetrical_los(current_target->x,current_target->y,p_ptr->x,p_ptr->y))
@@ -2910,7 +3097,7 @@ void player_turn(actor* a)
 					break;
 				case KEY_ESC:
 					 current_mode = WALK_MODE; 
-					 draw();
+					 draw_scene();
 					 break;
 				case 'i':
 					draw_info(lx,ly);
