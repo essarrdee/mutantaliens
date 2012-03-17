@@ -11,14 +11,12 @@
 #pragma warning(disable: 4996)
 /*
 REAL TODO
-make aliens react to noise, make noise generators, make deafness, make noises happen
+make critical hits, decrease ammo
 make graduated sensitivity to smell, make alternatives for smell generator, 
-make brain slice
-make hologram, make blinding lights
+make brain slice,
+make blinding lights
 make remotes
 allow pickup, drop, hide, activate
-hide monster memory
-
 
 */
 const float PI = 3.14159265f;
@@ -48,6 +46,7 @@ inline float squaref(float x) {return x*x;}
 
 WINDOW* scratch;
 
+int difficulty = 0;
 const int KEY_ESC = 27;
 bool transmitter_destroyed = false;
 const int MAP_SIZE = 150;
@@ -142,6 +141,18 @@ int target_y;
 int ship_x;
 int ship_y;
 
+const char* const transmission[] = {"Please enjoy your stay!",
+	"Toilets are situated on every floor!",
+	"Please visit again!",
+	"Barnacle your ship for free at the drydock... just kidding!",
+	"The art gallery ship IDF Fuseli is currently docked at Bay 12. Visiting charge is 69,125 Zorkmids.",
+	"Please remember to take all your luggage and personal belongings with you when leaving the spaceport.",
+	"... are you there? Can you help me?",
+	"Isn't it such a beautiful day? I love it when that nebula does that thing with the sun... Hey, why not buy some stuff?",
+	"If you want to buy some stuff, why not get lost in the mall for a few days?"
+};
+std::vector<std::string> vtransmission(transmission,arrayend(transmission));
+
 inline int dinf(int x,int y,int xx,int yy)
 {
 	return std::max(abs(x-xx),abs(y-yy));
@@ -181,7 +192,7 @@ std::vector<std::string> rlmessages;
 int last_message_seen=0;
 inline std::string padmsg(std::string msg)
 {
-	return msg + std::string(viewport_width-msg.length(),' ');
+	return msg;// + std::string(viewport_width-msg.length(),' ');
 }
 void add_message(std::string msg)
 {
@@ -223,8 +234,11 @@ struct noise
 };
 noise LE_noise = {30.0,"explosion",true};
 noise HE_noise = {60.0,"big explosion",true};
+noise screech = {15.0,"screech",false};
 std::vector<std::vector<noise>> walk_noise(ZOO_SIZE+1,std::vector<noise>(TERRAIN_TYPES));
 std::vector<std::vector<noise>> run_noise(ZOO_SIZE+1,std::vector<noise>(TERRAIN_TYPES));
+noise fake_human_noise[2] = {{10.0f,"\"HELLO?\"",false},{10.0,"\"I'M MADE OF FOOD!\"",false}};
+noise generator_loud[2] = {{21.0f,"ROAR OF THUNDER",true},{21.0,"MERZBOW ON CRACK",true}};
 
 struct species
 {
@@ -242,6 +256,11 @@ struct species
 	int run_energy;
 	int stamina;
 	int size;
+	bool damage_known;
+	bool health_known;
+	bool walk_known;
+	bool run_known;
+	bool size_known;
 	noise still_noise;
 	noise melee_noise;
 	std::string syl1, syl2, name;
@@ -264,8 +283,14 @@ inline int viewport_bottom_edge()
 {
 	return centre_y+viewport_height/2;
 }
+void clear_area(int x,int y,int xr,int yr)
+{
+	for(int i=y;i<y+yr;i++)
+		mvaddstr(i,x,std::string(xr,' ').c_str());
+}
 
 std::vector<species*> zoo;
+species* average[3];
 species* human_sp;
 
 const char* const clusters_1[] = {"b","c","d","f","g","h","j","k","l","m","n","p","r","s","t","v","w","x","y","z"};
@@ -355,8 +380,8 @@ void init_species()
 	human->colour = COLOR_WHITE;
 	human->damage = 1;
 	human->walk_energy = 10;
-	human->run_energy = 21;
-	human->stamina = 1500;
+	human->run_energy = 19;
+	human->stamina = 1200;
 	human->size = 1;
 	noise wn[TERRAIN_TYPES] = {{1.0,"footsteps",false},{1.5,"footsteps",false},{1.5f,"footsteps",false},{2.0,"footsteps",false},{0.0,"",false},
 	{2.3f,"footsteps",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false}};
@@ -374,20 +399,29 @@ void init_species()
 	for (int spsp=0; spsp<ZOO_SIZE; spsp++)
 	{
 		species* alien = new species();
+		alien->damage_known = false;
+		alien->health_known = false;
+		alien->size_known = false;
+		alien->walk_known = false;
+		alien->run_known = false;
 		alien->id = spsp;
 		alien->syl1 = random_syllable();
 		alien->syl2 = random_syllable();
 		alien->name = alien->syl1+"-"+alien->syl2;
 		alien->ch = alien->name[0];
-		alien->colour = rand()%6+1;
+		/*alien->colour = rand()%6+1;
 		while(alien->colour == COLOR_GREEN)
 		{
 			alien->colour = rand()%6+1;
-		}
+		}*/
 		int size = rand()%3;
 		if(spsp == ZOO_SIZE -1) size = 2;
 		else if(spsp==ZOO_SIZE - 2) size = 1;
 		else if(spsp==ZOO_SIZE-3) size = 0;
+		if(size == 0) alien->colour = COLOR_MAGENTA;
+		if(size == 1) alien->colour = COLOR_CYAN;
+		if(size == 2) alien->colour = COLOR_YELLOW;
+
 		alien->size = size;
 		std::string walk_str;
 		std::string run_str;
@@ -400,7 +434,7 @@ void init_species()
 			alien->min_health = 4+rand()%4;
 			alien->health_range = rand()%2+1;
 
-			if(rand()%7<1)
+			if(rand()%7<1+difficulty/3)
 			{ alien->psychic_range = rand()%20+10; }
 
 			switch(rand()%7)
@@ -410,7 +444,7 @@ void init_species()
 			case 1: case 2: case 3:
 				alien->vis_range = rand()%4+4; break;
 			case 4: case 5: case 6:
-				alien->vis_range = rand()%2+2; break;
+				alien->vis_range = rand()%3+3; break;
 			}
 
 			if(rand()%7 < 2){
@@ -446,12 +480,14 @@ void init_species()
 			case 2:
 				walk_str = "pattering"; break;
 			}
-			switch(rand()%2)
+			switch(rand()%3)
 			{
 			case 0:
 				run_str = "scuttling"; break;
 			case 1:
 				run_str = "scampering"; break;
+			case 2:
+				run_str = "fluttering";
 			}
 			extra_noise = -4.0;
 			walk_noise[spsp] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
@@ -470,16 +506,16 @@ void init_species()
 			alien->min_health = 10+rand()%6;
 			alien->health_range = rand()%4+4;
 
-			if(rand()%7<2)
+			if(rand()%7<2+(difficulty-3)/3)
 			{ alien->psychic_range = rand()%30+20; }
 
 			switch(rand()%7)
 			{
 			case 0: case 1: case 2:
 				alien->vis_range = rand()%6+6; break;
-			case 3: case 4:
+			case 3: case 4: case 5:
 				alien->vis_range = rand()%4+4; break;
-			case 5: case 6:
+			case 6:
 				alien->vis_range = rand()%2+2; break;
 			}
 
@@ -542,7 +578,7 @@ void init_species()
 			alien->min_health = 20+rand()%10;
 			alien->health_range = rand()%7+5;
 
-			if(rand()%7<3)
+			if(rand()%7<3+(difficulty/5))
 			{ alien->psychic_range = rand()%30+20; }
 
 			switch(rand()%7)
@@ -613,6 +649,13 @@ void init_species()
 			(std::string(alien->smells||alien->hears?"with good ":"")+std::string(alien->hears?"hearing":"")+
 			 std::string(alien->hears&&alien->smells?" and ":"")+std::string(alien->smells?"sense of smell":"")).c_str());
 		alien->description = std::string(buf);*/
+		alien->walk_energy += (difficulty-5)/3;
+		alien->run_energy += (difficulty-5)/2;
+		alien->damage += (difficulty - 5)/2;
+		alien->hearing_thres -= (float)(difficulty-5)/3.0f;
+		alien->min_health += (difficulty-5)/3;
+		alien->vis_range += (difficulty-5)/4;
+		if(rand()%10 > difficulty) alien->psychic_range += 2*difficulty;
 		zoo.push_back(alien);
 	}
 }
@@ -627,6 +670,7 @@ struct actor
 	bool running;
 	int stamina;
 	bool dead;
+	bool certain;
 	int x, y;
 	int ai_x, ai_y;
 	int runaway_x, runaway_y;
@@ -636,10 +680,12 @@ struct actor
 };
 actor* current_target = NULL;
 std::vector<actor*> visible_actors;
+
 actor* p_ptr = NULL;
 actor* map_occupants[MAP_SIZE][MAP_SIZE];
 bool terrain_immovable(actor* a, int x, int y)
 {
+	if(!on_map(x,y)) return false;
 	if (map_terrain[x][y] == WALL || map_terrain[x][y] == NW_SE|| map_terrain[x][y] == SW_NE
 		|| map_terrain[x][y] == NS || map_terrain[x][y] == WE || map_terrain[x][y] == NOSE || map_terrain[x][y] == CPANEL) return true;
 	if (map_occupants[x][y] != NULL && map_occupants[x][y] != a) return true;
@@ -690,6 +736,7 @@ std::vector<item*> next_timer_devices;
 item* map_items[MAP_SIZE][MAP_SIZE];
 std::vector<actor*> actors;
 std::vector<item*> items;
+std::vector<actor*> holograms;
 std::vector<item*> devices;
 std::vector<std::vector<std::vector<item*>>> dev_inv;//type,configuration,individual. Not joking.
 
@@ -709,14 +756,14 @@ void react_to_noise(actor* a,noise* n,int xx, int yy)
 			{
 				float t = 180*atan(float(dy)/(float)dx)/PI;
 				if(t<-67.5)
-				{dir_this_turn = (dx>0?"South":"North");}
+				{dir_this_turn = (dx>0?"North":"South");}
 				else if(t<-22.5)
-				{dir_this_turn = (dx>0?"SEast":"NWest");}
+				{dir_this_turn = (dx>0?"NEast":"SWest");}
 				else if(t<22.5)
 				{dir_this_turn = (dx>0?"East":"West");}
 				else if(t<67.5)
-				{dir_this_turn = (dx>0?"NEast":"SWest");}
-				else {dir_this_turn = (dx>0?"North":"South");}
+				{dir_this_turn = (dx>0?"SEast":"NWest");}
+				else {dir_this_turn = (dx>0?"South":"North");}
 			}
 			else
 			{
@@ -728,6 +775,25 @@ void react_to_noise(actor* a,noise* n,int xx, int yy)
 			}
 		}
 		else{dir_this_turn = "???";}
+	}
+	else if(!a->is_hologram)
+	{
+		if(n->scary)
+		{
+			if(a->sspecies->size != 2)
+			{
+			a->runaway_x = xx;
+			a->runaway_y = yy;
+			}
+		}
+		else
+		{
+			if(!a->certain)
+			{
+				a->ai_x = xx;
+				a->ai_y = yy;
+			}
+		}
 	}
 }
 
@@ -815,7 +881,6 @@ std::pair<int,int> nearby_home_for_item(int x,int y)
 
 }
 
-
 void inv_remove(item* dev)
 {
 	kill_velement(dev_inv[dev->device_type][dev->configuration],dev);
@@ -880,8 +945,10 @@ actor* add_actor(species* sp, bool p, int xx, int yy,bool hologram=false)
 	a->running = false;
 	a->stamina = sp->stamina;
 	a->energy = 100*(int)(p);
+
 	a->x = xx;
 	a->y = yy;
+	a->certain = false;
 	a->ai_x = xx;
 	a->ai_y = yy;
 	a->most_noticeable_sound = 0.0f;
@@ -894,6 +961,10 @@ actor* add_actor(species* sp, bool p, int xx, int yy,bool hologram=false)
 	}
 	a->health = (sp->health_range? rand()%(sp->health_range):0)+sp->min_health;
 	a->sound_threshold = a->sspecies->hearing_thres;
+	if(hologram)
+	{
+		holograms.push_back(a);
+	}
 	return a;
 }
 
@@ -1102,11 +1173,11 @@ void init_map()
 			map_human_scent[x][y] = 0.001f*randfloat()+0.02f;
 			if(x != 0 && x != MAP_SIZE-1 && y != 0 && y != MAP_SIZE-1)
 			{
-				switch(rand()%11)
+				switch(rand()%13)
 				{
-				case 0: case 1: case 2: case 3:
+				case 0: case 1: case 2: case 3: case 4:
 					map_terrain[x][y] = STREE; break;
-				case 4: case 5: case 6:
+				case 5: case 6: case 7:
 					map_terrain[x][y] = BTREE;break;
 				default:
 					map_terrain[x][y] = DIRT;
@@ -1237,7 +1308,7 @@ void init_actors()
 	std::pair<int,int> ploc = random_occupiable_square();
 	ploc = random_occupiable_square();
 	p_ptr = add_actor(zoo[0],true,ship_x,ship_y);
-	for(int i=0;i<10;i++)
+	for(int i=0;i<10+difficulty;i++)
 	{
 		ploc = random_occupiable_square();
 		add_actor(zoo[(rand()%ZOO_SIZE)+1],false,ploc.first,ploc.second);
@@ -1256,8 +1327,14 @@ bool is_wall(int x, int y)
 	return map_terrain[x][y] == WALL;
 }
 
+bool undiffusable(int x, int y)
+{
+	return (map_terrain[x][y] == WALL || map_terrain[x][y] == SW_NE || map_terrain[x][y] == NW_SE || map_terrain[x][y] == NS || map_terrain[x][y] == WE || map_terrain[x][y] == CPANEL || map_terrain[x][y] == NOSE);
+}
+
 bool is_opaque(int x, int y)
 {
+	if(!on_map(x,y)) return true;
 	return map_terrain[x][y] == WALL || map_terrain[x][y] == BTREE|| map_terrain[x][y] == NW_SE|| map_terrain[x][y] == SW_NE
 		|| map_terrain[x][y] == NS || map_terrain[x][y] == WE || map_terrain[x][y] == NOSE || map_terrain[x][y] == CPANEL;
 }
@@ -1281,7 +1358,10 @@ void update_device_desciption(item* dev)
 item* add_device(int type,int x,int y,bool in_inv)
 {
 	item* dev = new item();
-	dev->projection = add_actor(zoo[0],false,-500,-500,true);
+	if(type == HOLOGRAM_PROJECTOR)
+	{
+		dev->projection = add_actor(zoo[0],false,-500,-500,true);
+	}
 	dev->device_type = type;
 	dev->colour = COLOR_RED;
 	dev->wavelength = -1;
@@ -1331,8 +1411,8 @@ item* add_device(int type,int x,int y,bool in_inv)
 	dev->base_description = dev->description;
 	if (in_inv)
 	{
-		dev->x = -1;
-		dev->y = -1;
+		dev->x = p_ptr->x;
+		dev->y = p_ptr->y;
 		device_to_inventory(dev);
 	}
 	else
@@ -1399,9 +1479,9 @@ void init_items()
 {
 	for(int i=0;i<WAVELENGTHS;i++)
 	{rm_devices[i] = NULL;}
-	ammo[PISTOL] = 150;
-	ammo[RIFLE] = 300;
-	ammo[CANNON] = 30;
+	ammo[PISTOL] = 60-difficulty;
+	ammo[RIFLE] = 160 - 4*difficulty;
+	ammo[CANNON] = 30-difficulty;
 	dev_inv = std::vector<std::vector<std::vector<item*>>>(DEVICE_TYPES,(std::vector<std::vector<item*>>(DEVICE_CONFIGURATIONS)));
 	item* dev;
 	for(int i=0;i<5;i++)
@@ -1454,7 +1534,16 @@ void init()
 	noecho();
 	cbreak();
 	keypad(stdscr,TRUE);
-	scratch = newpad(viewport_height,viewport_width);
+	mvaddstr(5,5,"Choose a difficulty level (0 to 9):");
+	move(6,15);
+	int kp = 0;
+	while(kp - '0' < 0 || kp - '0' > 9)
+	{
+		kp = getch();
+	}
+	difficulty = kp - '0';
+	if(difficulty > 6) difficulty += (difficulty-6)*3;
+	//scratch = newpad(viewport_height,viewport_width);
 	init_species();
 	init_map();
 	init_actors();
@@ -1479,36 +1568,47 @@ inline void draw_ch(int x,int y,char ch, int col)
 }
 std::string walk_description(species* sp)
 {
+	if(!sp->walk_known) return "    ";
 	if(sp->walk_energy > human_sp->walk_energy) return "fast";
 	else if(sp->walk_energy < human_sp->walk_energy) return "slow";
 	return "avrg";
 }
 std::string run_description(species* sp)
 {
+	if(!sp->run_known) return "    ";
 	if(sp->run_energy > human_sp->run_energy) return "fast";
 	else if(sp->run_energy < human_sp->run_energy) return "slow";
 	return "avrg";
 }
 std::string damage_description(species* sp)
 {
+	if(!sp->damage_known) return "    ";
 	if(sp->damage <= 4) return "weak";
 	if(sp->damage <= 8) return "strg";
 	return "dngr";
 }
 std::string health_description(species* sp)
 {
+	if(!sp->health_known) return "     ";
 	if(sp->min_health <= 6) return "frail";
 	return "tough";
+}
+std::string size_description(species* sp)
+{
+	if(!sp->size_known) return "     ";
+	return std::string(size_descriptors[sp->size]);
 }
 void draw_memory()
 {
 	for(int i=10;i<10+ZOO_SIZE;i++)
 	{
 		species* sp = zoo[i-9];
+		if(sp->size_known)
 		attron(COLOR_PAIR(sp->colour));
+		else attron(COLOR_PAIR(COLOR_WHITE));
 		mvaddstr(i,viewport_width+1,std::string(1,sp->ch).c_str());
 		attron(COLOR_PAIR(COLOR_WHITE));
-		mvaddstr(i, viewport_width+1+2, (std::string(size_descriptors[sp->size])+" "+
+		mvaddstr(i, viewport_width+1+2, (size_description(sp)+" "+
 			walk_description(sp)+" "+run_description(sp)+" "+damage_description(sp)+
 			" "+health_description(sp)).c_str());
 	}
@@ -1516,10 +1616,11 @@ void draw_memory()
 void draw_stats()
 {
 	attron(COLOR_PAIR(COLOR_WHITE));
-	for(int i=3;i<11+ZOO_SIZE;i++)
-	{
-		mvaddstr(i,viewport_width+1,std::string(disp_columns-viewport_width-1,' ').c_str());
-	}
+	//for(int i=3;i<11+ZOO_SIZE;i++)
+	//{
+	//	mvaddstr(i,viewport_width+1,std::string(disp_columns-viewport_width-1,' ').c_str());
+	//}
+	clear_area(viewport_width+1,3,disp_columns-viewport_width-1,8+ZOO_SIZE);
 	mvprintw(3,(viewport_width+1),"HP: %d/%d %s    ",p_ptr->health,p_ptr->sspecies->min_health,
 		p_ptr->running?"running":"       ");
 	mvprintw(4,(viewport_width+1),(std::string("     ")+
@@ -1638,7 +1739,8 @@ void draw_tile_description(int x, int y)
 			if(symmetrical_los(p_ptr->x,p_ptr->y,x,y) || debug)
 			{
 				attron(COLOR_PAIR(map_occupants[x][y]->sspecies->colour));
-				mvaddstr(2,(viewport_width+1),map_occupants[x][y]->sspecies->name.c_str());
+				mvaddstr(2,(viewport_width+1),(map_occupants[x][y]->sspecies->name +
+					(map_occupants[x][y]->running?", running":"         ")).c_str());
 				if(current_mode == FIRE_MODE || current_mode == THROW_MODE)
 				{
 					attron(COLOR_PAIR(COLOR_WHITE));
@@ -1672,6 +1774,8 @@ char scent_strength(float scent)
 
 void draw_tile(int x, int y,bool record_actors = false)
 {
+	if(!on_map(x,y))
+	{draw_ch(x,y,' ',COLOR_WHITE); return;}
 	char ch = terrain_chars[map_terrain[x][y]];
 	int colour = terrain_colours[map_terrain[x][y]];
 	if (!map_seen[x][y] && !debug)
@@ -1689,6 +1793,9 @@ void draw_tile(int x, int y,bool record_actors = false)
 		{
 			ch = map_occupants[x][y]->sspecies->ch;
 			colour = map_occupants[x][y]->sspecies->colour;
+			map_occupants[x][y]->sspecies->size_known = true;
+			if(map_occupants[x][y]->running) map_occupants[x][y]->sspecies->run_known = true;
+			else map_occupants[x][y]->sspecies->walk_known = true;
 			if(map_occupants[x][y] != p_ptr && record_actors)
 			{
 				visible_actors.push_back(map_occupants[x][y]);
@@ -1826,25 +1933,37 @@ bool nearer_actor (actor* a,actor* b)
 
 void draw(bool record_actors=false)
 {
-	draw_stats();
+	
 	draw_tile_description(p_ptr->x,p_ptr->y);
 	centre_x = std::min(p_ptr->x,MAP_SIZE - viewport_width/2);
 	centre_x = std::max(centre_x,viewport_width/2);
 	centre_y = std::min(p_ptr->y,MAP_SIZE - viewport_height/2);
 	centre_y = std::max(centre_y,viewport_height/2);
-	for(int x=viewport_left_edge();x<viewport_right_edge(); x++)
+	for(int x=viewport_left_edge();x<=viewport_right_edge(); x++)
 	{
 		for(int y=viewport_top_edge();y<viewport_bottom_edge(); y++)
 		{
 			draw_tile(x,y,record_actors);
 		}
 	}
+	draw_stats();
+	//for(int x=
 	sort(visible_actors.begin(),visible_actors.end(),nearer_actor);
 	draw_last_msg();
 	wrefresh(stdscr);
 }
 int move_actor(actor* a, int dx, int dy)
 {
+	if(a->is_player)
+	{
+		for(unsigned int i=0;i<devices.size();i++)
+		{
+			if(devices[i]->player_has)
+			{
+				devices[i]->x = p_ptr->x; devices[i]->y = p_ptr->y;
+			}
+		}
+	}
 	if (dx==0 && dy==0)
 		return 1;
 	int ox = a->x; int oy = a->y;
@@ -1909,6 +2028,7 @@ void kill_actor(actor* a)
 	if(current_target == a) current_target = NULL;
 	a->dead = true;
 	add_message("The "+a->sspecies->name+" dies.");
+	a->sspecies->health_known = true;
 	add_junk(a->sspecies->name +" corpse","the bloody corpse of a "+a->sspecies->name,'%',a->sspecies->colour,a->x,a->y);
 }
 
@@ -1936,11 +2056,14 @@ void win()
 
 void hurt_actor(actor* a,int damage)
 {
+	if(!a->is_hologram)
+	{
 	a->health -= damage;
 	if(a->health <= 0)
 	{
 		if (a->is_player) {lose();}
 		else kill_actor(a);
+	}
 	}
 }
 
@@ -1963,6 +2086,7 @@ void do_explosion(explosion ex)
 						transmitter_destroyed = true;
 						map_items[ex.x+i][ex.y+j] = NULL;
 						target_x = -500; target_y = -500;
+						add_message("Perhaps the ship will stop pretending to be docked now!");
 
 					}
 				}
@@ -1990,6 +2114,7 @@ void do_explosion(explosion ex)
 void melee_attack(actor* attacker, actor* defender)
 {
 	add_message("The "+attacker->sspecies->name+" claws you.");
+	attacker->sspecies->damage_known = true;
 	hurt_actor(defender,attacker->sspecies->damage);
 }
 
@@ -2015,10 +2140,21 @@ bool fire_weapon(int x1, int y1, int x2, int y2)
 				break;
 		}
 		actor* victim = map_occupants[x2][y2];
+		if(current_weapon == CANNON)
+		{
+			explosion ex;
+			ex.x = x2; ex.y = y2;
+			ex.centre_damage = damage; ex.radius = 1;
+			do_explosion(ex);
+		}
+		else
 		if(victim != NULL)
 		{
 			add_message("The "+victim->sspecies->name+" is hit!");
+			
+			{
 			hurt_actor(victim,damage);
+			}
 			return true;
 		}
 	}
@@ -2076,7 +2212,17 @@ void random_walk(actor* a)
 
 void hologram_turn(actor* a)
 {
+	
+}
 
+std::pair<int,int> overshoot(int x,int y,int xx,int yy)
+{
+	int dx = xx-x; int dy = yy-y;
+	return std::make_pair(xx+dx,yy+dy);
+}
+void set_ai_target(actor* a, std::pair<int,int> target)
+{
+	a->ai_x = target.first; a->ai_y = target.second;
 }
 
 
@@ -2084,32 +2230,75 @@ void ai_turn(actor* a)
 {
 	if(dinf(a->x,a->y,p_ptr->x,p_ptr->y) == 1)
 	{
+		a->ai_x = p_ptr->x; a->ai_y = p_ptr->y;
 		melee_attack(a,p_ptr);
 		return;
 	}
 	bool uncertain = true;
 
+	if(rand()%10==0) {a->runaway_x = -500; a->runaway_y = -500;}
+	bool not_scared = (a->runaway_x == -500 && a->runaway_y == -500);
+
 	if(a->sspecies->psychic_range)
 	{
-		float d2 = sqrt((float)d22(a->x,a->y,p_ptr->x,p_ptr->y));
-		if(d2<=(float)psychic_0_range && randfloat() < 1.0 + squaref((float)a->sspecies->psychic_range/6 - d2) /
-			(float)squarei(a->sspecies->psychic_range - psychic_1_range))
+		std::vector<std::pair<int,int>> psychables;
+		
+		for (unsigned int i=0;i<devices.size();i++)
 		{
-			a->ai_x = p_ptr->x; a->ai_y = p_ptr->y;
+			if(devices[i]->device_type == BRAIN_SLICE && devices[i]->current_action == HUMAN_STIMULUS)
+			{
+				float d2 = sqrt((float)d22(a->x,a->y,devices[i]->x,devices[i]->y));
+				if(d2<=(float)a->sspecies->psychic_range && randfloat() < squaref(1.0f + ((float)a->sspecies->psychic_range/6 - d2) /
+					(float)(a->sspecies->psychic_range - a->sspecies->psychic_range/6)))
+				{
+					psychables.push_back(std::make_pair(devices[i]->x,devices[i]->y));
+				}
+			}
+		}
+		float d2 = sqrt((float)d22(a->x,a->y,p_ptr->x,p_ptr->y));
+		if(d2<=(float)a->sspecies->psychic_range && randfloat() < squaref(1.0f + ((float)a->sspecies->psychic_range/6 - d2) /
+			(float)(a->sspecies->psychic_range - a->sspecies->psychic_range/6)))
+		{
+			psychables.push_back(std::make_pair(p_ptr->x,p_ptr->y));
+		}
+		if (psychables.size())
+		{
+			std::pair<int,int> pt = psychables[rand()%psychables.size()];
+			set_ai_target(a,overshoot(a->x,a->y,pt.first,pt.second));
+			//a->ai_x = p_ptr->x; a->ai_y = p_ptr->y;
 			uncertain = false;
+			a->certain = true;
 		}
 	}
 	if(uncertain && d22(a->x,a->y,p_ptr->x,p_ptr->y) <= squarei(a->sspecies->vis_range))
 	{
+		std::vector<actor*> visible;
 		if(symmetrical_los(a->x,a->y,p_ptr->x,p_ptr->y))
 		{
-			a->ai_x = p_ptr->x; a->ai_y = p_ptr->y;
-			if((p_ptr->running ? human_sp->run_energy : human_sp->walk_energy) > a->sspecies->walk_energy
-				&& a->stamina > a->sspecies->stamina/4)
+			visible.push_back(p_ptr);
+		}
+		for(unsigned int i = 0; i<holograms.size();i++)
+		{
+			if(symmetrical_los(a->x,a->y,holograms[i]->x,holograms[i]->y))
 			{
-				a->running = true;
+				visible.push_back(holograms[i]);
 			}
-			uncertain = false;
+		}
+		if(visible.size())
+		{
+			actor* vis_target = visible[rand()%visible.size()];
+
+			if(symmetrical_los(a->x,a->y,vis_target->x,vis_target->y))
+			{
+				set_ai_target(a,overshoot(a->x,a->y,vis_target->x,vis_target->y));
+				if((vis_target->running ? human_sp->run_energy : human_sp->walk_energy) > a->sspecies->walk_energy
+					&& a->stamina > a->sspecies->stamina/4)
+				{
+					a->running = true;
+				}
+				uncertain = false;
+				a->certain = true;
+			}
 		}
 	}
 	//if(uncertain && a->sspecies->hearing && rand()%10 < 3)
@@ -2120,16 +2309,18 @@ void ai_turn(actor* a)
 	if(a->x==a->ai_x && a->y ==a->ai_y)
 	{
 		a->running = false;
+		a->certain = false;
 		if(a->sspecies->smell_clarity)
 		{
 			scent_walk(a); return;
 		}
 		random_walk(a); return;
 	}
+	make_noise(a->x,a->y,&screech);
 	int dx = (a->x) - (a->ai_x);
 	int dy = (a->y) - (a->ai_y);
-
-	int best = d1(a->x,a->y,p_ptr->x,p_ptr->y)+2;
+	int best = d1(a->x,a->y,a->ai_x,a->ai_y)+2;
+	int bestscare = d1(a->x,a->y,a->runaway_x,a->runaway_y);
 	int bestdx = 0; int bestdy = 0;
 	for(int d=0;d<8;d++)
 	{
@@ -2137,14 +2328,17 @@ void ai_turn(actor* a)
 		int ddx = dir.first; int ddy = dir.second;
 		if (!terrain_immovable(a,a->x+ddx,a->y+ddy))
 		{
-			int dist = d1(a->x+ddx,a->y+ddy,p_ptr->x,p_ptr->y);
-			if (dist < best)
+			int dist = d1(a->x+ddx,a->y+ddy,a->ai_x,a->ai_y);
+			int scaredist = d1(a->x+ddx,a->y+ddy,a->runaway_x,a->runaway_y);
+			if (dist < best && (not_scared || scaredist <= bestscare))
 			{best = dist; bestdx = ddx; bestdy = ddy;}
 			else if (dist == best)
 			{
-				int ddist = dinf(a->x+ddx,a->y+ddy,p_ptr->x,p_ptr->y);
-				int ddist2 = dinf(a->x+bestdx,a->y+bestdy,p_ptr->x,p_ptr->y);
-				if (ddist < ddist2)
+				int ddist = dinf(a->x+ddx,a->y+ddy,a->ai_x,a->ai_y);
+				int ddist2 = dinf(a->x+bestdx,a->y+bestdy,a->ai_x,a->ai_y);
+				int ddistscare = dinf(a->x+ddx,a->y+ddy,a->runaway_x,a->runaway_y);
+				int ddistscare2 = dinf(a->x+ddx,a->y+ddy,a->runaway_x,a->runaway_y);
+				if (ddist < ddist2 && (not_scared || ddistscare >= ddistscare2))
 				{best = dist; bestdx = ddx; bestdy = ddy;}
 			}
 		}
@@ -2174,25 +2368,38 @@ void update_map_seen()
 	}
 }
 
-std::string signal_strength(int x,int y)
-{std::string ss = "The radio signal is ";
-	int d2 = d22(x,y,target_x,target_y);
-	if((float)sqrt((float)d2) < 9+rand()%3)
-		return ss+ "coming from very close by!";
-	else if ((float)sqrt((float)d2) < 18 + rand()%6)
-		return ss+"very strong!";
-	else if ((float)sqrt((float)d2) < 36 + rand()%12)
-		return ss+"quite strong.";
-	else if ((float)sqrt((float)d2) < 72 + rand()%24)
-		return ss+ "quite weak.";
-	else if ((float)sqrt((float)d2) < 400)
-		return ss+"very weak...";
-	return "The radio transmitter is destroyed. Home time!";
+//std::string signal_strength(int x,int y)
+//{std::string ss = "The radio signal is ";
+//	int d2 = d22(x,y,target_x,target_y);
+//	if((float)sqrt((float)d2) < 9+rand()%3)
+//		return ss+ "coming from very close by!";
+//	else if ((float)sqrt((float)d2) < 18 + rand()%6)
+//		return ss+"very strong!";
+//	else if ((float)sqrt((float)d2) < 36 + rand()%12)
+//		return ss+"quite strong.";
+//	else if ((float)sqrt((float)d2) < 72 + rand()%24)
+//		return ss+ "quite weak.";
+//	else if ((float)sqrt((float)d2) < 400)
+//		return ss+"very weak...";
+//	return "The radio transmitter is destroyed. Home time!";
+//}
+std::string signal_receive(int x,int y)
+{
+	if(target_x==-500) return "The radio transmitter is destroyed. Home time!";
+	std::string ss = vtransmission[rand()%vtransmission.size()];
+	float d2 = sqrt((float)d22(x,y,target_x,target_y));
+	float signal = squaref(1.0f + ((float)10 - d2) /
+			(float)(100 - 10));
+	std::string tt = "";
+	for(unsigned int i=0;i<ss.length();i++)
+		tt += (randfloat()<signal)?ss[i]:'*';
+	return "\""+tt+"\"";
 }
 
 int select_device()
 {
 	attron(COLOR_PAIR(COLOR_WHITE));
+	clear_area(0,0,viewport_width,4);
 	mvaddstr(0,0, padmsg("Which kind of device? Q, q or ESC to cancel.").c_str());
 	mvaddstr(1,0, padmsg(std::string(count_inv_devices(LOW_EXPLOSIVE)?"a. Low explosive, ":"") +
 		std::string(count_inv_devices(HIGH_EXPLOSIVE)?"b. High explosive, ":"")).c_str());
@@ -2225,9 +2432,10 @@ int select_device()
 int select_configuration(int dev_type)
 {
 	attron(COLOR_PAIR(COLOR_WHITE));
-	mvaddstr(0,0,padmsg("Use a preconfigured device? Q, q or ESC to cancel.").c_str());
+	clear_area(0,0,viewport_width,2);
+	mvaddstr(0,0,padmsg("Use a preconfigured device? Q or ESC to cancel.").c_str());
 	mvaddstr(1,0,std::string(viewport_width,' ').c_str());
-	mvprintw(1,0,"(a) %d unconfigured, (b) %d on timer, (c) %d on remote",dev_inv[dev_type][UNCONFIGURED].size(),
+	mvprintw(1,0,"(a) %d unconfigured, (b) %d timer, (c) %d remote",dev_inv[dev_type][UNCONFIGURED].size(),
 		dev_inv[dev_type][ON_TIMER].size(),dev_inv[dev_type][ON_REMOTE].size());
 	
 	bool unacceptable = true;
@@ -2254,6 +2462,7 @@ item* select_individual_device_from_type_and_config(int type, int config)
 	bool unacceptable = true;
 	std::vector<item*>* options = &dev_inv[type][config];
 	attron(COLOR_PAIR(COLOR_WHITE));
+	clear_area(0,0,viewport_width,options->size());
 	for(unsigned int i=0;i<options->size();i++)
 	{
 		mvprintw(i,0,"(%c) %s with %d seconds remaining",'a'+i, (*options)[i]->name.c_str(), (*options)[i]->time_remaining);
@@ -2270,6 +2479,7 @@ item* select_individual_device_from_type_and_config(int type, int config)
 
 int ask_for_time()
 {
+	clear_area(0,0,viewport_width,1);
 	mvaddstr(0,0,"Enter time (0 to 9). q or ESC to cancel");
 	int t = -2;
 	while(t == -2)
@@ -2290,6 +2500,7 @@ int ask_for_time()
 
 int ask_for_wavelength()
 {
+	clear_area(0,0,viewport_width,3);
 	mvaddstr(0,0,"Use which wavelength? Choosing a wavelength");
 	mvaddstr(1,0,"already in use will destroy the existing link.");
 	mvaddstr(2,0,"q or ESC to cancel");
@@ -2359,6 +2570,10 @@ void set_timer(item* dev,int t)
 	//	rm_devices[dev->wavelength] = NULL;
 	//	dev->wavelength = -1;
 	//}
+	if(dev->device_type == NOISE_GENERATOR)
+	{
+		dev->next_action = rand()%2+1;
+	}
 	dev->configuration = ON_TIMER;
 	dev->time_remaining = t;
 }
@@ -2388,6 +2603,17 @@ bool reconfigure(item* a)
 	bool cancel = false;
 	while(unacceptable)
 	{
+		std::string s = a->description+" Reconfigure? Space or ("+std::string(1,a->configuration +'a')+
+			". Q or ESC to cancel.";
+		if(a->configuration != UNCONFIGURED)
+		{s += std::string(" (a) remove ")+(a->configuration==ON_TIMER?"timer":"remote control");}
+		if(a->configuration != ON_TIMER)
+		{s += std::string(" (b) use a timer instead");}
+		if(a->configuration != ON_REMOTE)
+		{s += std::string(" (c) use a remote control instead");}
+		s += ".";
+		draw_text_wodge(s);
+		/*clear_area(0,0,viewport_width,5);
 		mvaddstr(0,0,a->description.c_str());
 		mvprintw(1,0,"Reconfigure? Space or (%c) to leave unchanged",a->configuration +'a');
 		mvaddstr(2,0,"q or ESC to cancel");
@@ -2405,8 +2631,9 @@ bool reconfigure(item* a)
 		if(a->configuration != ON_REMOTE)
 		{
 			mvprintw(i,0,"(c) use a remote control instead");
-		}
+		}*/
 		int kp = fgetch();
+		draw();
 		if(kp == 'q' || kp == 'Q' || kp == KEY_ESC)
 		{
 			unacceptable = false;
@@ -2458,6 +2685,21 @@ item* select_individual_device()
 			device_type = select_device();
 			if(device_type >= 0)
 			{
+				item* dev = dev_inv[device_type][UNCONFIGURED].back();
+				dev_inv[device_type][UNCONFIGURED].pop_back();
+				int t = ask_for_time();
+			
+				if (t >= 0)
+				{
+					set_timer(dev,t);
+					return dev;
+				}
+				else
+				{
+					return NULL;
+				}
+			}/*
+			{
 				int device_configuration = 999;
 				while(device_configuration != -1)
 				{
@@ -2485,7 +2727,7 @@ item* select_individual_device()
 					}
 				}
 				if(device_configuration == -1) break;
-			}
+			}*/
 		}
 	}
 	else
@@ -2530,8 +2772,8 @@ void player_turn(actor* a)
 		case 'Z':
 			if(current_weapon != CANNON) {turn = 0; add_message("You get out the plasma cannon!!"); current_weapon = CANNON;} break;
 		case 'r':
-			turn = 0; add_message(signal_strength(p_ptr->x,p_ptr->y)); draw_last_msg(); break;
-		case 'd':
+			turn = 0; add_message(signal_receive(p_ptr->x,p_ptr->y)); draw_last_msg(); break;
+		case 'd':break;
 			debug = !debug; break;
 		case ' ':
 			last_message_seen = rlmessages.size();
@@ -2705,7 +2947,7 @@ void diffuse_scent_human()
 				{
 					std::pair<int,int> dir = directions[d];
 					int xx = x+dir.first; int yy = y+dir.second;
-					if(!is_wall(xx,yy))
+					if(!undiffusable(xx,yy))
 					{
 						spare_scent_map[x][y] += map_human_scent[xx][yy];
 						count++;
@@ -2801,9 +3043,40 @@ int play_turn()
 							if(rand()%7 < 2) (*dev)->power_remaining -= 1;
 							(*dev)->power_remaining = std::max(0,(*dev)->power_remaining);
 						}
-						if((*dev)->device_type == HOLOGRAM_PROJECTOR)
+						else if((*dev)->device_type == HOLOGRAM_PROJECTOR)
 						{
-							;
+							actor* pr = (*dev)->projection;
+							if(pr->x != -500)
+							{
+								map_occupants[pr->x][pr->y] = NULL;
+							}
+							int x = rand()%9;
+							int y = rand()%9;
+							while(terrain_immovable(pr,(*dev)->x+x-4,(*dev)->y+y-4))
+							{
+								x = rand()%9;
+								y = rand()%9;
+							}
+							map_occupants[(*dev)->x+x-4][(*dev)->y+y-4] = pr;
+							pr->x = (*dev)->x+x-4;
+							pr->y = (*dev)->y+y-4;
+							
+
+						}
+						else if((*dev)->device_type == NOISE_GENERATOR)
+						{
+							if((*dev)->current_action == HUMAN_STIMULUS)
+							{
+							make_noise((*dev)->x,(*dev)->y,&fake_human_noise[rand()%2]);
+							}
+							else if((*dev)->current_action == LOUD_STIMULUS)
+							{
+								make_noise((*dev)->x,(*dev)->y,&generator_loud[rand()%2]);
+							}
+						}
+						else if((*dev)->device_type == BRAIN_SLICE)
+						{
+							(*dev)->current_action = HUMAN_STIMULUS;
 						}
 					}
 					for(std::vector<item*>::iterator dev = explode_this_turn.begin(); dev != explode_this_turn.end(); ++dev)
@@ -2833,14 +3106,17 @@ int play_turn()
 					if(act->energy > 100)
 					{
 						act->energy -= 100;
+						if(!debug)
+						{
 						ai_turn(act);
+						}
 						act->most_noticeable_sound = 0.0;
 						act->sound_threshold = std::max(act->sound_threshold-act->sspecies->hearing_adapt,act->sspecies->hearing_thres);
 					}
 				}
 			}
 		}
-		if(rand()%4000+150+turn_count >4000 && rand()%70 == 0)
+		if(rand()%4000+150+turn_count >4000 && rand()%(45-6*(difficulty-5)) == 0)
 		{
 			std::pair<int,int> loc = random_occupiable_square();
 
