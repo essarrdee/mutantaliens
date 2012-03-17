@@ -123,7 +123,7 @@ template<class T> void kill_velement(std::vector<T>& vec, T elem)
 const int disp_lines = 25;
 const int disp_columns = 80;
 const int viewport_height = 24;
-const int viewport_width = 50;
+const int viewport_width = 49;
 int centre_x = 0;
 int centre_y = 0;
 const int vis_range = 8;
@@ -1506,9 +1506,9 @@ void draw_memory()
 	{
 		species* sp = zoo[i-9];
 		attron(COLOR_PAIR(sp->colour));
-		mvaddstr(i,viewport_width,std::string(1,sp->ch).c_str());
+		mvaddstr(i,viewport_width+1,std::string(1,sp->ch).c_str());
 		attron(COLOR_PAIR(COLOR_WHITE));
-		mvaddstr(i, viewport_width+2, (std::string(size_descriptors[sp->size])+" "+
+		mvaddstr(i, viewport_width+1+2, (std::string(size_descriptors[sp->size])+" "+
 			walk_description(sp)+" "+run_description(sp)+" "+damage_description(sp)+
 			" "+health_description(sp)).c_str());
 	}
@@ -1518,24 +1518,24 @@ void draw_stats()
 	attron(COLOR_PAIR(COLOR_WHITE));
 	for(int i=3;i<11+ZOO_SIZE;i++)
 	{
-		mvaddstr(i,viewport_width,std::string(disp_columns-viewport_width,' ').c_str());
+		mvaddstr(i,viewport_width+1,std::string(disp_columns-viewport_width-1,' ').c_str());
 	}
-	mvprintw(3,viewport_width,"HP: %d/%d %s    ",p_ptr->health,p_ptr->sspecies->min_health,
+	mvprintw(3,(viewport_width+1),"HP: %d/%d %s    ",p_ptr->health,p_ptr->sspecies->min_health,
 		p_ptr->running?"running":"       ");
-	mvprintw(4,viewport_width,(std::string("     ")+
+	mvprintw(4,(viewport_width+1),(std::string("     ")+
 		std::string(current_weapon==PISTOL?"________ ":"         ")+
 		std::string(current_weapon==RIFLE?"_______ ":"        ")+
 		std::string(current_weapon==CANNON?"________":"        ")).c_str());
-	mvprintw(5,viewport_width,"Ammo X Pistol Y Rifle Z Cannon");
-	mvprintw(6,viewport_width,"          %3d     %3d       %2d",ammo[PISTOL],ammo[RIFLE],ammo[CANNON]);
-	mvprintw(7,viewport_width,"%10s %10s stamina",mode_text[current_mode],
+	mvprintw(5,(viewport_width+1),"Ammo X Pistol Y Rifle Z Cannon");
+	mvprintw(6,(viewport_width+1),"          %3d     %3d       %2d",ammo[PISTOL],ammo[RIFLE],ammo[CANNON]);
+	mvprintw(7,(viewport_width+1),"%10s %10s stamina",mode_text[current_mode],
 		std::string(10*p_ptr->stamina / p_ptr->sspecies->stamina,'*').c_str());
-	mvprintw(8,viewport_width,"Devic LEx HEx Hol Noi Sce Brn");
-	mvprintw(9,viewport_width,"Count A%2d B%2d C%2d D%2d E%2d F%2d",
+	mvprintw(8,(viewport_width+1),"Devic LEx HEx Hol Noi Sce Brn");
+	mvprintw(9,(viewport_width+1),"Count A%2d B%2d C%2d D%2d E%2d F%2d",
 		count_inv_devices(LOW_EXPLOSIVE),count_inv_devices(HIGH_EXPLOSIVE),
 		count_inv_devices(HOLOGRAM_PROJECTOR),count_inv_devices(NOISE_GENERATOR),
 		count_inv_devices(SCENT_GENERATOR),count_inv_devices(BRAIN_SLICE));
-	mvprintw(10+ZOO_SIZE,viewport_width,(sound_this_turn+(sound_this_turn!=""?" from ":"")+dir_this_turn).c_str());
+	mvprintw(10+ZOO_SIZE,(viewport_width+1),(sound_this_turn+(sound_this_turn!=""?" from ":"")+dir_this_turn).c_str());
 	draw_memory();
 }
 
@@ -1617,28 +1617,28 @@ void draw_tile_description(int x, int y)
 {
 	for(int i=0;i<3;i++)
 	{
-		mvaddstr(i,viewport_width,std::string(disp_columns-viewport_width,' ').c_str());
+		mvaddstr(i,(viewport_width+1),std::string(disp_columns-(viewport_width+1),' ').c_str());
 	}
 	if (!map_seen[x][y] && !debug)
 	{
 		attron(COLOR_PAIR(COLOR_WHITE));
-		mvprintw(0,viewport_width,"%d, %d, unseen",x,y);
+		mvprintw(0,(viewport_width+1),"%d, %d, unseen",x,y);
 	}
 	else
 	{
 		attron(COLOR_PAIR(terrain_colours[map_terrain[x][y]]));
-		mvprintw(0,viewport_width,"%d, %d, %s",x,y,terrain_descriptors[map_terrain[x][y]]);
+		mvprintw(0,(viewport_width+1),"%d, %d, %s",x,y,terrain_descriptors[map_terrain[x][y]]);
 		if (map_items[x][y] != NULL)
 		{
 			attron(COLOR_PAIR(map_items[x][y]->colour));
-			mvaddstr(1,viewport_width,("a "+map_items[x][y]->name).c_str());
+			mvaddstr(1,(viewport_width+1),("a "+map_items[x][y]->name).c_str());
 		}
 		if (map_occupants[x][y] != NULL)
 		{
 			if(symmetrical_los(p_ptr->x,p_ptr->y,x,y) || debug)
 			{
 				attron(COLOR_PAIR(map_occupants[x][y]->sspecies->colour));
-				mvaddstr(2,viewport_width,map_occupants[x][y]->sspecies->name.c_str());
+				mvaddstr(2,(viewport_width+1),map_occupants[x][y]->sspecies->name.c_str());
 				if(current_mode == FIRE_MODE || current_mode == THROW_MODE)
 				{
 					attron(COLOR_PAIR(COLOR_WHITE));
@@ -1651,7 +1651,7 @@ void draw_tile_description(int x, int y)
 void undraw_tile_description()
 {
 	for (int i=0;i<3;i++)
-	mvaddstr(i,viewport_width,std::string(disp_columns-viewport_width,' ').c_str());
+	mvaddstr(i,(viewport_width+1),std::string(disp_columns-(viewport_width+1),' ').c_str());
 }
 
 char scent_strength(float scent)
