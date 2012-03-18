@@ -11,7 +11,7 @@
 #pragma warning(disable: 4996)
 /*
 allowable polish TODO:
-'?' for more help, mac binary, check that killed cursor is compatible with mac, kill the crash
+
 
 */
 
@@ -154,8 +154,8 @@ const char* const transmission[] = {"Please enjoy your stay!",
 	"Please remember to take all your luggage and personal belongings with you when leaving the spaceport.",
 	"... are you there? Can you help me?",
 	"Isn't it such a beautiful day? I love it when that nebula does that thing with the sun... Hey, why not buy some stuff?",
-	"If you want to buy some stuff, why not get lost in the mall for a few days?",
-	"testabcdefghijklmnopqrstuvwxyzaabbccddeeffgghhiijjkkllmmnnooppqqrrssttuuvvwwxxyyzztteesstttestabcdefghijklmnopqrstuvwxyzaabbccddeeffgghhiijjkkllmmnnooppqqrrssttuuvvwwxxyyzztteesstt"
+	"If you want to buy some stuff, why not get lost in the mall for a few days?"
+	//"testabcdefghijklmnopqrstuvwxyzaabbccddeeffgghhiijjkkllmmnnooppqqrrssttuuvvwwxxyyzztteesstttestabcdefghijklmnopqrstuvwxyzaabbccddeeffgghhiijjkkllmmnnooppqqrrssttuuvvwwxxyyzztteesstt"
 };
 std::vector<std::string> vtransmission(transmission,arrayend(transmission));
 
