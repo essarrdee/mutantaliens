@@ -32,14 +32,12 @@ start with small aliens, or mention in tutorial.
 prevent shooting, throwing onto wall tiles?
 allow transparent passable things?
 
-make devices have an effect
 make devices activateable, hideable, droppable, pickupable, remotable
 make guns structs
-make monsters react better to sound, make sounds interesting
+make monsters react better to sound,
 make monsters follow other monters to the player
 make pack monsters try to maintain distance from player while a group assembles, before closing in
 make detailed species descriptions
-make monster memory
 make buildings multilevel
 */
 
@@ -2850,21 +2848,21 @@ void player_turn(actor* a)
 		int kp = fgetch();
 		switch(kp)
 		{
-		case KEY_UP: case 'k': case '8':
+		case KEY_UP: case 'k': case '8': case KEY_A2:
 			turn = move_actor(a,0,-1); break;
-		case KEY_DOWN: case 'j':case '2':
+		case KEY_DOWN: case 'j':case '2': case KEY_C2:
 			turn = move_actor(a,0,1); break;
-		case KEY_LEFT: case 'h': case '4':
+		case KEY_LEFT: case 'h': case '4': case KEY_B1:
 			turn = move_actor(a,-1,0); break;
-		case KEY_RIGHT: case 'l': case '6':
+		case KEY_RIGHT: case 'l': case '6': case KEY_B3:
 			turn = move_actor(a,1,0); break;
-		case 'y':case '7':
+		case 'y':case '7': case KEY_A1:
 			turn = move_actor(a,-1,-1); break;
-		case 'u':case '9':
+		case 'u':case '9': case KEY_A3:
 			turn = move_actor(a,1,-1); break;
-		case 'b':case '1':
+		case 'b':case '1': case KEY_C1:
 			turn = move_actor(a,-1,1); break;
-		case 'n':case '3':
+		case 'n':case '3': case KEY_C3:
 			turn = move_actor(a,1,1); break;
 		case '.':
 			turn = 0; break;
@@ -2882,6 +2880,10 @@ void player_turn(actor* a)
 				pretty_print
 				(
 				/*"01234567890123456789012345678901234567890123456789"*/
+				  "                                                  "
+				  "      Find and destroy the radio transmitter      "
+				  "            so that you can escape!               "
+				  "                                                  "
 				  "Movement: y/7  k/8  u/9  Fire:             f      "
 				  "hjklyubn     \\  |  /     Throw:            t      "
 				  "42867913      \\ | /      Run:              R      "
@@ -2892,9 +2894,11 @@ void player_turn(actor* a)
 				  "               fire or //Autotarget:     tab      "
 				  "               throw   ||Manual target: movement  "
 				  "               mode    \\\\Info on tile:     i      "
+				  "                         Quit game:        Q      "
 				  "                                                  "
 				  "        Press ? again for more info.              "
 				  "   You might also want to read the README.        "
+				  "                                                  "
 				); break;
 				case 1:
 				pretty_print
@@ -2916,7 +2920,7 @@ void player_turn(actor* a)
 				case 2: pretty_print
 			(
 			"You've never seen these aliens before, so you don't know how dangerous they are. As you observe them, you will record your findings in the status panel. "
-			"The first column isthe creature's symbol, the second is its size (small, medium, or huge), the third is its walking speed (faster or slower than your walk), "
+			"The first column is the creature's symbol, the second is its size (small, medium, or huge), the third is its walking speed (faster or slower than your walk), "
 			"the fourth is its maximum running speed (faster or slower than your maximum running speed), the fifth is its damage (weak, strong, or dangerous), "
 			" and the sixth is its health (frail or tough - frail creatures are very easy to kill, and some tough creatures may die to just a few rifle bursts)."
 			"                                    Press ? again for more info.                         "
@@ -2942,6 +2946,21 @@ void player_turn(actor* a)
 			if(current_weapon != CANNON) {turn = 0; add_message("You get out the plasma cannon!!"); current_weapon = CANNON;} break;
 		case 'r':
 			turn = 0; add_message(signal_receive(p_ptr->x,p_ptr->y)); draw_last_msg(); break;
+		case 'g':
+			if(count_inv_devices(BRAIN_SLICE) > 0)
+			{
+				add_message("You wash a brain slice with Tx-PBS three times with gentle shaking.");
+				draw_last_msg();
+			}
+			break;
+		case 'Q':
+			pretty_print("Are you sure you want to quit? press Y if you are.");
+			if(fgetch() == 'Y')
+			{
+				endwin();
+				exit(0);
+			}
+			break;
 		case 'd':break;
 			debug = !debug; break;
 		case ' ':
@@ -2981,21 +3000,21 @@ void player_turn(actor* a)
 						ly = visible_actors[tab_ind]->y;
 					}
 					break;
-				case KEY_UP: case 'k':
+				case KEY_UP: case 'k': case '8': case KEY_A2:
 					ly = std::max(ly-1,viewport_top_edge()); break;
-				case KEY_DOWN: case 'j':
+				case KEY_DOWN: case 'j': case '2': case KEY_C2:
 					ly = std::min(ly+1,viewport_bottom_edge()); break;
-				case KEY_LEFT: case 'h':
+				case KEY_LEFT: case 'h': case '4': case KEY_B1:
 					lx = std::max(lx-1,viewport_left_edge()); break;
-				case KEY_RIGHT: case 'l':
+				case KEY_RIGHT: case 'l': case '6': case KEY_B3:
 					lx = std::min(lx+1,viewport_right_edge()); break;
-				case 'y':
+				case 'y': case '7': case KEY_A1:
 					lx = std::max(lx-1,viewport_left_edge()); ly = std::max(ly-1,viewport_top_edge()); break;
-				case 'u':
+				case 'u': case '9': case KEY_A3:
 					lx = std::min(lx+1,viewport_right_edge()); ly = std::max(ly-1,viewport_top_edge()); break;
-				case 'b':
+				case 'b': case '1': case KEY_C1:
 					lx = std::max(lx-1,viewport_left_edge()); ly = std::min(ly+1,viewport_bottom_edge()); break;
-				case 'n':
+				case 'n': case '3': case KEY_C3:
 					lx = std::min(lx+1,viewport_right_edge()); ly = std::min(ly+1,viewport_bottom_edge()); break;
 				case 't':
 					{
@@ -3062,21 +3081,21 @@ void player_turn(actor* a)
 						ly = visible_actors[tab_ind]->y;
 					}
 					break;
-				case KEY_UP: case 'k':
+				case KEY_UP: case 'k': case '8': case KEY_A2:
 					ly = std::max(ly-1,viewport_top_edge()); break;
-				case KEY_DOWN: case 'j':
+				case KEY_DOWN: case 'j': case '2': case KEY_C2:
 					ly = std::min(ly+1,viewport_bottom_edge()); break;
-				case KEY_LEFT: case 'h':
+				case KEY_LEFT: case 'h': case '4': case KEY_B1:
 					lx = std::max(lx-1,viewport_left_edge()); break;
-				case KEY_RIGHT: case 'l':
+				case KEY_RIGHT: case 'l': case '6': case KEY_B3:
 					lx = std::min(lx+1,viewport_right_edge()); break;
-				case 'y':
+				case 'y': case '7': case KEY_A1:
 					lx = std::max(lx-1,viewport_left_edge()); ly = std::max(ly-1,viewport_top_edge()); break;
-				case 'u':
+				case 'u': case '9': case KEY_A3:
 					lx = std::min(lx+1,viewport_right_edge()); ly = std::max(ly-1,viewport_top_edge()); break;
-				case 'b':
+				case 'b': case '1': case KEY_C1:
 					lx = std::max(lx-1,viewport_left_edge()); ly = std::min(ly+1,viewport_bottom_edge()); break;
-				case 'n':
+				case 'n': case '3': case KEY_C3:
 					lx = std::min(lx+1,viewport_right_edge()); ly = std::min(ly+1,viewport_bottom_edge()); break;
 				case 'f':
 					if(ammo[current_weapon] == 0)

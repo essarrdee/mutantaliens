@@ -1,0 +1,13 @@
+Significant changes since 7DRL release:
+
+* Messages etc. print nicely (respecting word boundaries)
+* Radio transmitter is now cyan, for improved visibility
+* Selected weapon is coloured yellow, rather than indicated with ______
+* Added blue stars to make it clear what the maximum stamina is
+* Targetting lines are now cyan when targetting an alien
+* Added ? for ingame help
+* Autotargetting now works when throwing
+* Numpad keys now work for targetting
+* Numlock may not be necessary
+* Added Q to quit the game
+* Included frivolous easter egg that slipped my mind after day 1

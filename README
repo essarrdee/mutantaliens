@@ -32,9 +32,10 @@ R to start or stop running (actually this makes you do everything faster). As yo
 f to enter fire mode, hjklyubn or numpad/arrow keys to target, f to fire, i to inspect targeted square, tab to autotarget visible monsters.
 t to enter throwing mode, hjklyubn or numpad/arrow keys to target, t to confirm location, hjklabcdef to select device. 0-9 to set timer (0 activates/explodes on impact, others wait that number of turns at your walking speed).
 i to view some information about the contents of a targetted tile, in fire mode or throw mode.
-tab to autotarget visible monsters, in fire mode (but not throw mode).
+tab to autotarget visible monsters, in fire mode and throw mode.
 X,Y,Z to wield pistol, assault rifle, or plasma cannon. Their fire power is in that order. The plasma cannon does splash damage, try not to shoot it at adjacent enemies. You autowield the rifle. It takes a turn to switch.
 Which one you are wielding is indicated by a line above the weapon in use.
+Q lets you quit, but that's not very useful.
 
 The memory display shows all observed information about a species. It may show species symbol, species size, species walk speed (relative to your walk), species max run speed (relative to your max run speed), species damage (absolute), and species health (absolute).
 The species health descriptions are not very helpful at the moment - monsters marked frail will die very *very* easily, but many monsters marked "tough" will also die easily. You'll have to observe species health yourself.
