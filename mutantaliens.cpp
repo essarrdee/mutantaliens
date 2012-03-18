@@ -8,6 +8,16 @@
 #include <math.h>
 #include <array>
 
+#define KEY_A1        0x1c1  /* upper left on Virtual keypad */
+#define KEY_A2        0x1c2  /* upper middle on Virt. keypad */
+#define KEY_A3        0x1c3  /* upper right on Vir. keypad */
+#define KEY_B1        0x1c4  /* middle left on Virt. keypad */
+#define KEY_B2        0x1c5  /* center on Virt. keypad */
+#define KEY_B3        0x1c6  /* middle right on Vir. keypad */
+#define KEY_C1        0x1c7  /* lower left on Virt. keypad */
+#define KEY_C2        0x1c8  /* lower middle on Virt. keypad */
+#define KEY_C3        0x1c9  /* lower right on Vir. keypad */
+
 #pragma warning(disable: 4996)
 /*
 allowable polish TODO:
