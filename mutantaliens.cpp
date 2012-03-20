@@ -981,6 +981,7 @@ void item_to_location(item* a, int x, int y)
 	if(a->player_has)
 	{
 		inv_remove(a);
+		a->player_has = false;
 	}
 	std::pair<int,int> place_here = nearby_home_for_item(x,y);
 	if(place_here != std::make_pair(-1,-1))
@@ -2569,7 +2570,7 @@ int select_configuration(int dev_type)
 	return config;
 }
 
-item* select_individual_device_from_type_and_config(int type, int config)
+item* selectghjk_individual_device_from_type_and_config(int type, int config)
 {
 	bool unacceptable = true;
 	std::vector<item*>* options = &dev_inv[type][config];
@@ -2671,11 +2672,11 @@ void set_timer(item* dev,int t)
 	{
 		set_unconfigured(dev);
 		timer_devices.push_back(dev);
-		if(dev->player_has)
-		{
-			inv_remove(dev);
-			dev_inv[dev->device_type][ON_TIMER].push_back(dev);
-		}
+		//if(dev->player_has)
+		//{
+		//	//inv_remove(dev);
+		//	//dev_inv[dev->device_type][ON_TIMER].push_back(dev);
+		//}
 	}
 	//if(dev->configuration == ON_REMOTE)
 	//{
@@ -3037,6 +3038,7 @@ void player_turn(actor* a)
 							if(dev != NULL)
 							{
 								item_to_location(dev,lx,ly);
+								inv_remove(dev);
 								turn = 0;
 								current_mode = WALK_MODE;
 								dev->player_has = false;
