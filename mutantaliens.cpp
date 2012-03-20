@@ -2797,13 +2797,14 @@ item* select_individual_device()
 			device_type = select_device();
 			if(device_type >= 0)
 			{
-				item* dev = dev_inv[device_type][UNCONFIGURED].back();
-				dev_inv[device_type][UNCONFIGURED].pop_back();
+				
 				int t = ask_for_time();
 			
 				if (t >= 0)
 				{
+					item* dev = dev_inv[device_type][UNCONFIGURED].back();
 					set_timer(dev,t);
+					dev_inv[device_type][UNCONFIGURED].pop_back();
 					return dev;
 				}
 				else
