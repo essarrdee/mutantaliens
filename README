@@ -41,6 +41,7 @@ Y                       WIELD RIFLE
 Z                       WIELD CANNON (splash damage)
 ?                       DISPLAY HELP
 Q                       QUIT
+M                       MUTE ADVICE
 
 Tiles:
 . t +                   walkable, transparent

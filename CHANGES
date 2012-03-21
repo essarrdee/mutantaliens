@@ -17,3 +17,4 @@ Significant changes since 7DRL release:
 * Say what the montser memory columns mean
 * Prevent player from being "trapped" (escape is easy with explosives) when the ship crashes into a building
 * Automatically autotarget, don't just wait for tab
+* Made the ? help neater and less verbose

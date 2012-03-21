@@ -3014,35 +3014,61 @@ void player_turn(actor* a)
 				case 1:
 				pretty_print
 					(
-				  /*"01234567890123456789012345678901234567890123456789"*/
-				  "Your resources: You have three guns: a pistol, an assault rifle, and a plasma cannon. "
-				  "They are presented in order of power, but you have limited ammunition. "
-				  "You can wield them using X, Y, and Z. "
-				  "The plasma cannon causes explosions, so try not to get caught in the blast. "
-				  "You have various throwable devices to help you against the alien onslaught. "
-				  "There are two types of explosives, low power (a) and high power (b). "
-				  "There are also hologram projectors (c), noise generators (d), "
-				  "scent generators (e), and brain slices (f). "
-				  "These will distract enemies that are sensitive to light, sound, smell, or brain waves, respectively. "
-				  "When you throw them, you can set a timer from 0 to 9, so that they activate immediately or after you've taken that number of steps at walking speed."
-				  "                                    Press ? again for more info.     "
-
+				/*"01234567890123456789012345678901234567890123456789"*/
+				  "Your guns:                           f to fire    "
+				  " Pistol (low damage),                             "
+				  " Rifle (med damage),                              "
+				  " Cannon (high splash damage)                      "
+				  "Your devices:                        t to throw   "
+				  " Low explosives (rad. 2),                         "
+				  " High explosives (rad. 4),                        "
+				  " Distractions:                                    "
+				  "  Hologram (C), Noise (D), Scent (E),             "
+				  "  Brain slice (F) (for psychic aliens)            "
+				  " Set a timer from 0 to 9 when throwing.           "
+				  "                                                  "
+				  "       Press ? again for more info.               "
+				  "                                                  "
 					);break;
 				case 2: pretty_print
 			(
-			"You've never seen these aliens before, so you don't know how dangerous they are. As you observe them, you will record your findings in the status panel. "
-			"The first column is the creature's symbol, the second is its size (small, medium, or huge), the third is its walking speed (faster or slower than your walk), "
-			"the fourth is its maximum running speed (faster or slower than your maximum running speed), the fifth is its damage (weak, strong, or dangerous), "
-			" and the sixth is its health (frail or tough - frail creatures are very easy to kill, and some tough creatures may die to just a few rifle bursts)."
-			"                                    Press ? again for more info.                         "
+				/*"01234567890123456789012345678901234567890123456789"*/
+				  "Monster memory:                                   "
+				  "No-one has seen this planet or these aliens       "
+				  "before and lived to tell the tale.                "
+				  "To survive, you keep a note of your observations  "
+				  "In the status panel.                              "
+				  "The first column is size (small, medium, huge),   "
+				  "The second is walk speed (slow, average, fast)    "
+				  "   (relative to your walk speed)                  "
+				  "The third is max run speed (slow, average, fast)  "
+				  "   (relative to your max run speed)               "
+				  "   (as stamina runs out, you get slower)          "
+				  "The fourth is damage (weak, strong, dangerous)    "
+				  "The last is health (frail or tough)               "
+				  "Frail aliens are very easy to kill.               "
+				  "Some tough aliens are easier to kill than others  "
+				  "                                                  "
+				  "     Press ? again for more info.                 "
+				  "                                                  "
 			);break;
 				case 3:
 					pretty_print
 			(
-			"Your ship is claiming, despite the surrounding trees and hostile aliens, to be safely docked at a space station. You need to fix "
-			"this malfunction so that you can get off this planet. The ship uses automated radio signals to dock, so there must be a radio transmitter here. "
-			"You can use your portable radio to try to find the source of the transmissions, then disable it with explosives and escape."
-			"                                          Press ? again for more info.                 "
+				/*"01234567890123456789012345678901234567890123456789"*/
+				  " Your ship is claiming, despite the surrounding   "
+				  "   trees and hostile aliens, to be safely docked "
+				  "    at a space station.                           "
+				  "  You need to fix this malfunction and get off    "
+				  "    this planet.                                  "
+				  "  The ship uses automated radio signals to dock,  "
+				  "    so there must be a radio transmitter here.    "
+				  "  You can use your portable radio to try to find  "
+				  "    the source of the transmissions,              "
+				  "    then disable it with explosives and escape.   "
+				  "                                                  "
+				  "       Press ? again for more info.               "
+				  "                                                  "
 			);break;
 				}
 				page++;
