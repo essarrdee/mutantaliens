@@ -1,7 +1,8 @@
 MUTANT ALIENS!
 
 https://github.com/essarrdee/mutantaliens
-Direct download: http://songseed.org/srd/mutantaliens_update2.zip
+http://roguebasin.com/index.php/Mutant%20Aliens!
+Direct download: http://songseed.org/srd/mutantaliens_update3.zip
 
 
 To run on Windows, run mutantaliens.exe
@@ -9,47 +10,64 @@ To build and run on UNIX-like systems, type:
         make
         ./mutantaliens
 If it complains, try:
-		make esc_ok
-		./mutantaliens
+        make esc_ok
+        ./mutantaliens
 
 If there is a crash or some unpleasant behaviour, please email me about it, preferably with a screenshot and/or a way to reproduce it.
 
+In this game, your SHIP gets a bit confused about some radio TRANSMISSIONS, lands you on an unexplored planet, opens the doors, and refuses to shut them.
+Your only option, of course, is to pick up your RADIO, GUNS, EXPLOSIVES, and miscellaneous DEVICES, and go DESTROY the transmitter.
+Hopefully your ship will let you CLOSE THE DOORS and get to your INTENDED destination once you've accomplished that.
+
+Of course, this being an unexplored planet, it's full of ALIEN MONSTERS that want to claw out your SPLEEN and eat it. Hence all the firearms.
+
 0 is the lowest difficulty, and is a bit too easy. 9 is the hardest difficulty, and it might be winnable! 4 or 5 is supposed to be the standard difficulty.
 
+Commands:
+hjklyubn or numpad      MOVEMENT
+f                       FIRE WEAPON
+    tab                 TARGET WEAPON (AUTO)
+    move                TARGET WEAPON (MANUAL)
+    f                   CONFIRM SHOT
+t                       THROW DEVICE
+    tab                 TARGET DEVICE (AUTO)
+    move                TARGET DEVICE (MANUAL)
+    t                   CONFIRM THROW
+    0-9                    SET TIMER
+R                       START/STOP RUNNING (do this often)
+r                       CHECK RADIO SIGNAL STRENGTH
+X                       WIELD PISTOL
+Y                       WIELD RIFLE
+Z                       WIELD CANNON (splash damage)
+?                       DISPLAY HELP
+Q                       QUIT
+
 Tiles:
-Green . is soil. Walking on this is quietest.
-Green t is a small tree. Walking through this is slightly louder.
-Green T is a large tree. You can't see through them!
-White # is the wall (or the inert control panel of your ship).
-White . is a solid floor. Walking on these is quite noisy.
-White + is a door. These are transparent, but walking through them is rather noisy.
+. t +                   walkable, transparent
+T                       walkable, NOT transparent
+#                       not walkable, not transparent
+other                   your ship
 
+Devices (throw them and use a timer):
+A                       Low explosive (radius 2)
+B                       High explosive (radius 4)
+C                       Hologram (distracts enemies visually)
+D                       Noise (distracts enemies that hear it)
+E                       Scent (distracts enemies that smell it)
+F                       Brain slice (distracts psychic enemies)
 
-Commands which currently have a useful effect:
-hjklyubn or numpad to move. arrow keys work for orthogonal movement.
-r to check radio signal strength (a fraction of letters from the transmission will be *ed out). This tells you how close the goal is, but you'll have to figure out the direction yourself.
-R to start or stop running (actually this makes you do everything faster). As your stamina(**********) decreases, your running speed decreases to your walking speed. Monsters can do this too!
-f to enter fire mode, hjklyubn or numpad/arrow keys to target, f to fire, i to inspect targeted square, tab to autotarget visible monsters.
-t to enter throwing mode, hjklyubn or numpad/arrow keys to target, t to confirm location, hjklabcdef to select device. 0-9 to set timer (0 activates/explodes on impact, others wait that number of turns at your walking speed).
-i to view some information about the contents of a targetted tile, in fire mode or throw mode.
-tab to autotarget visible monsters, in fire mode and throw mode.
-X,Y,Z to wield pistol, assault rifle, or plasma cannon. Their fire power is in that order. The plasma cannon does splash damage, try not to shoot it at adjacent enemies. You autowield the rifle. It takes a turn to switch.
-Which one you are wielding is indicated by a line above the weapon in use.
-Q lets you quit, but that's not very useful.
-
-The memory display shows all observed information about a species. It may show species symbol, species size, species walk speed (relative to your walk), species max run speed (relative to your max run speed), species damage (absolute), and species health (absolute).
-The species health descriptions are not very helpful at the moment - monsters marked frail will die very *very* easily, but many monsters marked "tough" will also die easily. You'll have to observe species health yourself.
-Counts of ammo/devices in your inventory, and loudest sound heard this turn are also displayed. The direction the sound came from will sometimes disagree with what you see - thats because you can't hear very well.
-You and monsters will also tend to be deaf for quite a long time after using explosives.
-
-Try to use your radio to find the radio transmitter, destroy it using explosives (or cannon), and get back into the ship, without getting killed or letting an alien come with you alive.
-
-The devices you have are:
-(a) low explosive: radius 2, good damage (more than a cannon shot)
-(b) high explosive: radius 4, high damage (unless you're on a hard difficulty setting, a direct hit should kill anything that's not you)
-(c) hologram projector: projects a hologram, which will distract monsters from you if you're lucky.
-(d) noise generator: either emits sounds which will attract aliens and distract them from you, or plays harsh noise at deafening volumes, repelling monsters. Unfortunately, you don't choose which.
-(e) scent generator: emits a scent identical to your own, distracting monsters.
-(f) brain slice: some aliens don't need vision, scent, or sound to find you, they just tchyuuuune into your brahahahaaaaain waaaaaves. This device distracts such creatures.
+Memory:
+When you see a monster, your observations are recorded in the monster memory.
+You can immediately tell its size:
+    huge (yellow), medium (cyan), small (magenta)
+You can tell if its walk speed is faster or slower than yours:
+    slow (between 1/10 and 9/10), avrg (10/10), fast (11/10 +)
+If it runs, the same applies to its max running speed:
+    slow (less than 19/10), avrg (19/10), fast (20/10 +)
+A slow run might be faster than your walk!
+If it attacks you, you can tell how strong it is:
+    weak, strong, or dangerous
+If you kill one, you can tell how healthy it is:
+    frail (v. easy to kill), tough (easy, hard, or v. hard to kill)
 
 bug reports/comments/flames to (quendus at google's email domain)

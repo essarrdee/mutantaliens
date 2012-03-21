@@ -7,7 +7,7 @@
 #include <string>
 #include <math.h>
 #include <array>
-#
+
 //these are from pdcurses
 //#define KEY_A1        0x1c1  /* upper left on Virtual keypad */
 #define KEY_A2        0x1c2  /* upper middle on Virt. keypad */
@@ -41,7 +41,7 @@ const float PI = 3.14159265f;
 start with small aliens, or mention in tutorial.
 
 prevent shooting, throwing onto wall tiles?
-allow transparent passable things?
+allow transparent impassable things?
 
 make devices activateable, hideable, droppable, pickupable, remotable
 make guns structs
@@ -59,7 +59,7 @@ inline float squaref(float x) {return x*x;}
 //using namespace std;
 
 WINDOW* scratch;
-
+bool forcefed_help = false;
 int difficulty = 0;
 const int KEY_ESC = 27;
 bool transmitter_destroyed = false;
@@ -93,6 +93,66 @@ const int FIRE_MODE = 1;
 const int THROW_MODE = 2;
 const int INFO_MODE = 3;
 int current_mode = 0;
+bool cycle_advice=true;
+int current_advice=0;
+
+const char* const advice[] = {
+   /*                              */  
+	"Press R to run!",
+	"Press R to run!",
+	"Press R to run!",
+	"Flee often!",
+	"Conserve your stamina!",
+	"Yellow aliens: slow and strong",
+	"Magenta aliens: fast and weak",
+	"Cyan aliens: could be anything",
+	"Press f to fire!",
+	"Use your ammunition wisely!",
+	"Press t to throw devices!",
+	"Press t to throw devices!",
+	"Press t to throw devices!",
+	"Use your explosives wisely!",
+	"Find the radio transmitter!",
+	"Find the radio transmitter!",
+	"Destroy the transmitter!",
+	"Destroy the transmitter!",
+	"Destroy the transmitter!",
+	"You have explosives!",
+	"You have explosives!",
+	"You have explosives!",
+	"You have explosives!",
+	"Devices distract aliens",
+	"Devices distract aliens",
+	"Press X to use the pistol?",
+	"Press Y to use the rifle!",
+	"Press Y to use the rifle!",
+	"Press Z to use the cannon!!",
+	"Press Z to use the cannon!!",
+	"How close is the transmitter?",
+	"Press r to check for signal!",
+	"Press r to check for signal!",
+	"Can't see through big trees!",
+	"Can't see through big trees!",
+	"Can't see through big trees!",
+	"Be careful of ambushes!",
+	"Be careful of ambushes!",
+	"Trees have ears!",
+	"Trees have noses!",
+	"Trees have psychic powers!",
+	"Consult the memory often!",
+	"Aliens don't carry ammo!",
+	"Aliens don't carry medkits!",
+	"Holograms distract aliens!",
+	"Noise gen.s distract aliens!",
+	"Scent gen.s distract aliens!",
+	"Brain slices distract psychics",
+	"High expl.s kill huge aliens!",
+	"Low stamina means running slow",
+	"Low stamina means running slow",
+	"Low stamina means running slow"
+	
+};
+std::vector<std::string> vadvice(advice,arrayend(advice));
 
 const int WAVELENGTHS = 5;
 int map_terrain[MAP_SIZE][MAP_SIZE];
@@ -1213,6 +1273,12 @@ void draw_ship(int x,int y)
 		}
 
 	}
+	if(map_terrain[x+3][y] == FLOOR)
+	{
+		int i = x+3;
+		while(map_terrain[i][y] == FLOOR) {i++;}
+		map_terrain[i][y] = DOOR;
+	}
 
 }
 
@@ -1626,8 +1692,10 @@ void init()
 	cbreak();
 	curs_set(0);
 	keypad(stdscr,TRUE);
-	mvaddstr(5,5,"Choose a difficulty level (0 to 9):");
-	move(6,15);
+	mvaddstr(4,10,"Choose a difficulty level (0 to 9):");
+	mvaddstr(5,13,"0 is too easy, 9 is too hard,");
+	mvaddstr(6,10,"2 is ok for beginners, 5 is standard");
+	move(7,15);
 	int kp = 0;
 	while(kp - '0' < 0 || kp - '0' > 9)
 	{
@@ -1692,9 +1760,11 @@ std::string size_description(species* sp)
 }
 void draw_memory()
 {
-	for(int i=10;i<10+ZOO_SIZE;i++)
+	attron(COLOR_PAIR(COLOR_WHITE));
+	mvaddstr(10,viewport_width+1,"M size walk  run  dmg  hlth");
+	for(int i=11;i<11+ZOO_SIZE;i++)
 	{
-		species* sp = zoo[i-9];
+		species* sp = zoo[i-10];
 		if(sp->size_known)
 		attron(COLOR_PAIR(sp->colour));
 		else attron(COLOR_PAIR(COLOR_WHITE));
@@ -1713,7 +1783,7 @@ void draw_stats()
 	//{
 	//	mvaddstr(i,viewport_width+1,std::string(disp_columns-viewport_width-1,' ').c_str());
 	//}
-	clear_area(viewport_width+1,3,disp_columns-viewport_width-1,8+ZOO_SIZE);
+	clear_area(viewport_width+1,3,disp_columns-viewport_width-1,13+ZOO_SIZE);
 	mvprintw(3,(viewport_width+1),"HP: %d/%d %s    ",p_ptr->health,p_ptr->sspecies->min_health,
 		p_ptr->running?"running":"       ");
 	/*mvprintw(4,(viewport_width+1),(std::string("     ")+
@@ -1740,8 +1810,24 @@ void draw_stats()
 		count_inv_devices(LOW_EXPLOSIVE),count_inv_devices(HIGH_EXPLOSIVE),
 		count_inv_devices(HOLOGRAM_PROJECTOR),count_inv_devices(NOISE_GENERATOR),
 		count_inv_devices(SCENT_GENERATOR),count_inv_devices(BRAIN_SLICE));
-	mvprintw(10+ZOO_SIZE,(viewport_width+1),(sound_this_turn+(sound_this_turn!=""?" from ":"")+dir_this_turn).c_str());
-	mvprintw(12+ZOO_SIZE,viewport_width+3,"Press ? for help.");
+	mvprintw(11+ZOO_SIZE,(viewport_width+1),(sound_this_turn+(sound_this_turn!=""?" from ":"")+dir_this_turn).c_str());
+	if(current_mode == WALK_MODE)
+	{
+	mvprintw(13+ZOO_SIZE,viewport_width+3,"Press ? for help.");
+	}
+	else if(current_mode == FIRE_MODE)
+	{
+		mvprintw(13+ZOO_SIZE,viewport_width+3,"Tab to target, f to fire");
+	}
+	else if(current_mode == THROW_MODE)
+	{
+		mvprintw(13+ZOO_SIZE,viewport_width+3,"Tab to target, t to throw");
+	}
+	if(cycle_advice)
+	{
+	mvprintw(15+ZOO_SIZE,viewport_width+1,vadvice[current_advice].c_str());
+	}
+	mvprintw(16+ZOO_SIZE,viewport_width+3,"Press M to toggle advice");
 	draw_memory();
 }
 
@@ -2068,6 +2154,17 @@ void draw_scene(bool record_actors=false)
 }
 int move_actor(actor* a, int dx, int dy)
 {
+
+	if (dx==0 && dy==0)
+		return 1;
+	int ox = a->x; int oy = a->y;
+	int x = ox+dx; int y = oy+dy;
+	if(!on_map(x,y)) return 1;
+	if (terrain_immovable(a,x,y))
+	{
+
+		return 1;
+	}
 	if(a->is_player)
 	{
 		for(unsigned int i=0;i<devices.size();i++)
@@ -2077,15 +2174,6 @@ int move_actor(actor* a, int dx, int dy)
 				devices[i]->x = p_ptr->x; devices[i]->y = p_ptr->y;
 			}
 		}
-	}
-	if (dx==0 && dy==0)
-		return 1;
-	int ox = a->x; int oy = a->y;
-	int x = ox+dx; int y = oy+dy;
-	if (terrain_immovable(a,x,y))
-	{
-
-		return 1;
 	}
 	map_occupants[ox][oy] = NULL;
 	map_occupants[x][y] = a;
@@ -2858,7 +2946,16 @@ void player_turn(actor* a)
 	int turn = -1;
 	while(turn)
 	{
-		int kp = fgetch();
+		int kp;
+		if(!forcefed_help)
+		{
+			kp = '?';
+			forcefed_help = true;
+		}
+		else
+		{
+			kp = fgetch();
+		}
 		switch(kp)
 		{
 		case KEY_UP: case 'k': case '8': case KEY_A2:
@@ -2877,7 +2974,7 @@ void player_turn(actor* a)
 			turn = move_actor(a,-1,1); break;
 		case 'n':case '3': case KEY_C3:
 			turn = move_actor(a,1,1); break;
-		case '.':
+		case '.': case '5': case KEY_B2:
 			turn = 0; break;
 		case '?':
 			{
@@ -2908,6 +3005,7 @@ void player_turn(actor* a)
 				  "               throw   ||Manual target: movement  "
 				  "               mode    \\\\Info on tile:     i      "
 				  "                         Quit game:        Q      "
+				  "                         See this help:    ?      "
 				  "                                                  "
 				  "        Press ? again for more info.              "
 				  "   You might also want to read the README.        "
@@ -2985,8 +3083,20 @@ void player_turn(actor* a)
 			{
 				current_mode = THROW_MODE;
 				draw_scene();
+				int tab_ind = -1;
 				int lx = p_ptr->x; int ly = p_ptr->y;
-				if(current_target == NULL) current_target = p_ptr;
+				if(current_target == NULL || current_target == p_ptr)
+				{
+					if(visible_actors.size() == 0)
+					{
+						current_target = p_ptr;
+					}
+					else
+					{
+						current_target = visible_actors[0];
+						tab_ind = 0;
+					}
+				}
 				if(symmetrical_los(current_target->x,current_target->y,p_ptr->x,p_ptr->y))
 				{
 				lx = current_target->x; ly = current_target->y;
@@ -2995,7 +3105,7 @@ void player_turn(actor* a)
 				{
 					lx = p_ptr->x; ly = p_ptr->y;
 				}
-				int tab_ind = -1;
+				
 			while(current_mode==THROW_MODE)
 			{
 				draw_tile_description(lx,ly);
@@ -3062,12 +3172,29 @@ void player_turn(actor* a)
 			}
 			}
 			break;
+		case 'M':
+			cycle_advice = !cycle_advice;
+			draw_stats();
+			break;
 		case 'f':
 		{
 			current_mode = FIRE_MODE;
 			draw_scene();
+			int tab_ind = -1;
 			int lx,ly;
-			if(current_target == NULL) current_target = p_ptr;
+			if(current_target == NULL || current_target == p_ptr)
+			{
+
+				if(visible_actors.size() == 0)
+				{
+				current_target = p_ptr;
+				}
+				else
+				{
+					current_target = visible_actors[0];
+					tab_ind = 0;
+				}
+			}
 			if(symmetrical_los(current_target->x,current_target->y,p_ptr->x,p_ptr->y))
 			{
 			lx = current_target->x; ly = current_target->y;
@@ -3076,7 +3203,7 @@ void player_turn(actor* a)
 			{
 				lx = p_ptr->x; ly = p_ptr->y;
 			}
-			int tab_ind = -1;
+			
 			while (current_mode == FIRE_MODE)
 			{
 				draw_tile_description(lx,ly);
@@ -3181,6 +3308,10 @@ void diffuse_scent_human()
 
 int play_turn()
 {
+		if(turn_count%100 == 50)
+		{
+			current_advice = rand()%vadvice.size();
+		}
 		for(std::vector<actor*>::iterator a = actors.begin(); a != actors.end(); ++a)
 		{
 			actor* act = (*a);
