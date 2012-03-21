@@ -15,5 +15,5 @@ Significant changes since 7DRL release:
 * Prompt to press f/t again in fire/throw mode
 * Randomly give the player advice (since people can't be bothered to press ?). M to mute the advice.
 * Say what the montser memory columns mean
-* Prevent player from being "trapped" (escape is easy with explosives" when the ship crashes into a building
+* Prevent player from being "trapped" (escape is easy with explosives) when the ship crashes into a building
 * Automatically autotarget, don't just wait for tab
