@@ -9,11 +9,15 @@ To run on Windows, run mutantaliens.exe
 To build and run on UNIX-like systems, type:
         make
         ./mutantaliens
-If it complains, try:
+If it complains about something to do with "ESC", try:
         make esc_ok
         ./mutantaliens
+Mutant Aliens! requires a curses library, so you might need to try something along the lines of
+sudo apt-get install libncurses5-dev
+And if you're using Ubuntu and have never compiled something before, you will probably need to try
+sudo apt-get install build-essential
 
-If there is a crash or some unpleasant behaviour, please email me about it, preferably with a screenshot and/or a way to reproduce it.
+If there is a crash or some unpleasant behaviour or non-compilation, please email me about it, preferably with a screenshot and/or a way to reproduce it.
 
 In this game, your SHIP gets a bit confused about some radio TRANSMISSIONS, lands you on an unexplored planet, opens the doors, and refuses to shut them.
 Your only option, of course, is to pick up your RADIO, GUNS, EXPLOSIVES, and miscellaneous DEVICES, and go DESTROY the transmitter.
