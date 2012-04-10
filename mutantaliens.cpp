@@ -73,6 +73,7 @@ bool forcefed_help = false;
 int difficulty = 0;
 const int KEY_ESC = 27;
 bool transmitter_destroyed = false;
+bool door_closable_told = false;
 const int MAP_SIZE = 150;
 //terrain types
 const int DIRT = 0;
@@ -1074,7 +1075,7 @@ void item_to_location(item* a, int x, int y)
 	}
 	else
 	{
-		add_message("Abnormal item placement! Maybe it's in a wall, maybe it just squashed another item");
+		add_message("Abnormal item placement! Maybe it's in a wall, maybe it just squashed another item.");
 		draw_last_msg();
 		map_items[x][y] = a;
 		a->x = x; a->y = y;
@@ -1326,7 +1327,6 @@ bool door_closable()
 				{
 					player_present = true;
 				}
-				else return false;
 			}
 		}
 
@@ -1850,7 +1850,7 @@ void draw_stats()
 	//{
 	//	mvaddstr(i,viewport_width+1,std::string(disp_columns-viewport_width-1,' ').c_str());
 	//}
-	clear_area(viewport_width+1,3,disp_columns-viewport_width-1,13+ZOO_SIZE);
+	clear_area(viewport_width+1,3,disp_columns-viewport_width-1,14+ZOO_SIZE);
 	mvprintw(3,(viewport_width+1),"HP: %d/%d %s    ",p_ptr->health,p_ptr->sspecies->min_health,
 		p_ptr->running?"running":"       ");
 	/*mvprintw(4,(viewport_width+1),(std::string("     ")+
@@ -1895,6 +1895,10 @@ void draw_stats()
 	mvprintw(15+ZOO_SIZE,viewport_width+1,vadvice[current_advice].c_str());
 	}
 	mvprintw(16+ZOO_SIZE,viewport_width+3,"Press M to toggle advice");
+	if(door_closable())
+	{
+	mvprintw(17+ZOO_SIZE,viewport_width+5,"Press C to close the door");
+	}
 	draw_memory();
 }
 
@@ -1972,6 +1976,16 @@ bool symmetrical_los(int x1, int y1, int x2, int y2)
 	return (los_exists(x1, y1, x2, y2) || los_exists(x2, y2, x1, y1));
 }
 
+inline bool in_vis_range(int x, int y, int xx, int yy)
+{
+	return d22(x,y,xx,yy) <= vis_range*vis_range;
+}
+
+inline bool sym_los_in_range(int x1, int y1, int x2, int y2)
+{
+	return symmetrical_los(x1,y1,x2,y2) && in_vis_range(x1,y1,x2,y2);
+}
+
 void draw_tile_description(int x, int y)
 {
 	for(int i=0;i<3;i++)
@@ -1994,7 +2008,7 @@ void draw_tile_description(int x, int y)
 		}
 		if (map_occupants[x][y] != NULL)
 		{
-			if(symmetrical_los(p_ptr->x,p_ptr->y,x,y) || debug)
+			if(sym_los_in_range(p_ptr->x,p_ptr->y,x,y) || debug)
 			{
 				attron(COLOR_PAIR(map_occupants[x][y]->sspecies->colour));
 				mvaddstr(2,(viewport_width+1),(map_occupants[x][y]->sspecies->name +
@@ -2030,11 +2044,6 @@ char scent_strength(float scent)
 	
 }
 
-inline bool in_vis_range(int x, int y, int xx, int yy)
-{
-	return d22(x,y,xx,yy) <= vis_range*vis_range;
-}
-
 void draw_tile(int x, int y, bool record_actors = false)
 {
 	if(!on_map(x,y))
@@ -2050,7 +2059,7 @@ void draw_tile(int x, int y, bool record_actors = false)
 		ch = map_items[x][y]->ch;
 		colour = map_items[x][y]->colour;
 	}
-	if((symmetrical_los(p_ptr->x,p_ptr->y,x,y) && in_vis_range(p_ptr->x,p_ptr->y,x,y))|| debug)
+	if(sym_los_in_range(p_ptr->x,p_ptr->y,x,y)|| debug)
 	{
 		if (map_occupants[x][y] != NULL)
 		{
@@ -2071,40 +2080,40 @@ void draw_tile(int x, int y, bool record_actors = false)
 		draw_ch(x,y,ch,colour);
 	}
 }
-
-void draw_tile_dark(int x, int y,bool record_actors = false)
-{
-	if(!on_map(x,y))
-	{draw_ch(x,y,' ',COLOR_WHITE); return;}
-	char ch = terrain_chars[map_terrain[x][y]];
-	int colour = terrain_colours[map_terrain[x][y]];
-	if (!map_seen[x][y] && !debug)
-	{draw_ch(x,y,' ',colour); return;}
-	if(debug)
-		ch = scent_strength(map_human_scent[x][y]);
-	if (map_items[x][y] != NULL)
-	{
-		ch = map_items[x][y]->ch;
-		colour = map_items[x][y]->colour;
-	}
-	if (map_occupants[x][y] != NULL)
-	{
-		if(symmetrical_los(p_ptr->x,p_ptr->y,x,y) || debug)
-		{
-			ch = map_occupants[x][y]->sspecies->ch;
-			colour = map_occupants[x][y]->sspecies->colour;
-			map_occupants[x][y]->sspecies->size_known = true;
-			if(map_occupants[x][y]->running) map_occupants[x][y]->sspecies->run_known = true;
-			else map_occupants[x][y]->sspecies->walk_known = true;
-			if(map_occupants[x][y] != p_ptr && record_actors)
-			{
-				visible_actors.push_back(map_occupants[x][y]);
-			}
-
-		}
-	}
-	draw_ch(x,y,ch,colour);
-}
+//
+//void draw_tile_dark(int x, int y,bool record_actors = false)
+//{
+//	if(!on_map(x,y))
+//	{draw_ch(x,y,' ',COLOR_WHITE); return;}
+//	char ch = terrain_chars[map_terrain[x][y]];
+//	int colour = terrain_colours[map_terrain[x][y]];
+//	if (!map_seen[x][y] && !debug)
+//	{draw_ch(x,y,' ',colour); return;}
+//	if(debug)
+//		ch = scent_strength(map_human_scent[x][y]);
+//	if (map_items[x][y] != NULL)
+//	{
+//		ch = map_items[x][y]->ch;
+//		colour = map_items[x][y]->colour;
+//	}
+//	if (map_occupants[x][y] != NULL)
+//	{
+//		if(symmetrical_los(p_ptr->x,p_ptr->y,x,y) || debug)
+//		{
+//			ch = map_occupants[x][y]->sspecies->ch;
+//			colour = map_occupants[x][y]->sspecies->colour;
+//			map_occupants[x][y]->sspecies->size_known = true;
+//			if(map_occupants[x][y]->running) map_occupants[x][y]->sspecies->run_known = true;
+//			else map_occupants[x][y]->sspecies->walk_known = true;
+//			if(map_occupants[x][y] != p_ptr && record_actors)
+//			{
+//				visible_actors.push_back(map_occupants[x][y]);
+//			}
+//
+//		}
+//	}
+//	draw_ch(x,y,ch,colour);
+//}
 
 void draw_line(int x1, int y1, int x2, int y2, char ch)
 {
@@ -2112,7 +2121,7 @@ void draw_line(int x1, int y1, int x2, int y2, char ch)
 	int col = COLOR_BLUE;
 	if(on_map(x2,y2))
 	{
-		if(map_occupants[x2][y2] != NULL)
+		if(map_occupants[x2][y2] != NULL && sym_los_in_range(x1,y1,x2,y2))
 		{
 			col = COLOR_CYAN;
 		}
@@ -2333,7 +2342,10 @@ void kill_actor(actor* a)
 	map_occupants[a->x][a->y] = NULL;
 	if(current_target == a) current_target = NULL;
 	a->dead = true;
-	add_message("The "+a->sspecies->name+" dies.");
+	if(sym_los_in_range(p_ptr->x,p_ptr->y,a->x,a->y))
+	{
+		add_message("The "+a->sspecies->name+" dies.");
+	}
 	a->sspecies->health_known = true;
 	add_junk(a->sspecies->name +" corpse","the bloody corpse of a "+a->sspecies->name,'%',a->sspecies->colour,a->x,a->y);
 }
@@ -2350,8 +2362,15 @@ void lose()
 }
 void win()
 {
+	if(map_terrain[ship_x+2][ship_y] == DOOR)
+	{
+		add_message("You close the doors and fly away! Press Q to quit.");
+	}
+	else
+	{
+		add_message("You wipe some blood off the control panel and fly away! Press Q to quit.");
+	}
 	map_terrain[ship_x+2][ship_y] = NS;
-	add_message("You close the doors and fly away! Press Q to quit.");
 	draw_scene();
 	int kp = 0;
 	while(kp != 'Q') kp = fgetch();
@@ -2399,6 +2418,10 @@ void do_explosion(explosion ex)
 				if(map_occupants[ex.x+i][ex.y+j] != NULL)
 				{
 					hurt_actor(map_occupants[ex.x+i][ex.y+j],dam);
+					if(map_occupants[ex.x+i][ex.y+j]->is_player)
+					{
+						add_message("You are hit by the explosion!");
+					}
 				}
 			}
 			if(dam>=10)
@@ -3080,6 +3103,7 @@ void player_turn(actor* a)
 	int turn = -1;
 	while(turn)
 	{
+		draw_scene();
 		int kp;
 		if(!forcefed_help)
 		{
@@ -3247,16 +3271,22 @@ void player_turn(actor* a)
 			p_ptr->running = !p_ptr->running; draw_stats(); break;
 		case 't':
 			{
+
 				current_mode = THROW_MODE;
 				draw_scene();
+				
 				int tab_ind = autotarget();
 				int lx = current_target->x; int ly = current_target->y;
 				item* dev = select_individual_device();
 				if(dev == NULL) break;
 			while(current_mode==THROW_MODE)
 			{
+				draw_scene();
 				draw_tile_description(lx,ly);
 				draw_line(p_ptr->x,p_ptr->y,lx,ly,'*');
+				clear_area(0,0,viewport_width,1);
+				attron(COLOR_PAIR(COLOR_WHITE));
+				mvaddstr(0,0,"Tab or movement to target, t to throw");
 				int kpp = fgetch();
 				undraw_line(p_ptr->x,p_ptr->y,lx,ly);
 				undraw_tile_description();
@@ -3321,6 +3351,22 @@ void player_turn(actor* a)
 		case 'M':
 			cycle_advice = !cycle_advice;
 			draw_stats();
+			break;
+		case 'C':
+			if(door_closable())
+			{
+				if(map_terrain[ship_x+2][ship_y] == DOOR)
+				{
+					map_terrain[ship_x+2][ship_y] = NS;
+					turn = 0;
+					add_message("You tell the computer to close the doors.");
+				}
+				else
+				{
+					add_message("Not going to open them again. No way.");
+				}
+			}
+			else {add_message("Can't close the doors right now.");}
 			break;
 		case 'f':
 		{
@@ -3475,6 +3521,11 @@ int play_turn()
 						{
 							win();
 							
+						}
+						if(door_closable() && !door_closable_told)
+						{
+							add_message("Press 'C' to tell the computer to close the door (you can't take off with aliens in the ship, though).");
+							door_closable_told = true;
 						}
 						act->energy -= 100;
 						player_turn(act);
