@@ -23,11 +23,21 @@
 /*
 allowable polish TODO:
 
+close door on entry
+if the last message happened between the player's last turn and now, colour it, or reverse??? Make message section separate, add message review command.
+pick transmitter location better
+
+*/
+
+/*
+TODO for first non-7drl version:
 
 */
 
 /*
 REAL TODO
+make radio receiver get transmissions from ship after transmitter destroyed
+countdown to doors closing, leave a burnt hole in the ground if player is too slow (relative to difficulty)
 make critical hits
 make graduated sensitivity to smell, make alternatives for smell generator, 
 make blinding lights
@@ -555,7 +565,24 @@ void init_species()
 		alien->walk_known = false;
 		alien->run_known = false;
 		alien->id = spsp;
+		int size = rand()%3;
+		if(spsp == ZOO_SIZE -1) size = 2;
+		else if(spsp==ZOO_SIZE - 2) size = 1;
+		else if(spsp==ZOO_SIZE-3) size = 0;
 		alien->syl1 = random_syllable();
+		while(true)
+		{
+			bool ok_name = true;
+			for (int spspsp = 0; spspsp < spsp; spspsp++)
+			{
+				if(zoo[spspsp+1]->ch == alien->syl1[0] && zoo[spspsp+1]->size == alien->size)
+				{
+					ok_name = false;
+					alien->syl1 = random_syllable();
+				}
+			}
+			if(ok_name) break;
+		}
 		alien->syl2 = random_syllable();
 		alien->name = alien->syl1+"-"+alien->syl2;
 		alien->ch = alien->name[0];
@@ -564,10 +591,6 @@ void init_species()
 		{
 			alien->colour = rand()%6+1;
 		}*/
-		int size = rand()%3;
-		if(spsp == ZOO_SIZE -1) size = 2;
-		else if(spsp==ZOO_SIZE - 2) size = 1;
-		else if(spsp==ZOO_SIZE-3) size = 0;
 		if(size == 0) alien->colour = COLOR_MAGENTA;
 		if(size == 1) alien->colour = COLOR_CYAN;
 		if(size == 2) alien->colour = COLOR_YELLOW;
@@ -1273,13 +1296,52 @@ void draw_ship(int x,int y)
 		}
 
 	}
-	if(map_terrain[x+3][y] == FLOOR)
+	if(map_terrain[x+3][y] == WALL)
+	{
+		map_terrain[x+3][y] = DOOR;
+	}
+	if(map_terrain[x+3][y] == FLOOR || map_terrain[x+3][y] == DOOR)
 	{
 		int i = x+3;
-		while(map_terrain[i][y] == FLOOR) {i++;}
-		map_terrain[i][y] = DOOR;
+		while(map_terrain[i][y] == FLOOR || map_terrain[i][y] == DOOR) {i++;}
+		if(map_terrain[i][y] != STREE && map_terrain[i][y] != BTREE && map_terrain[i][y] != DIRT)
+		{
+			map_terrain[i][y] = DOOR;
+		}
 	}
 
+}
+bool door_closable()
+{
+	if (!transmitter_destroyed) return false;
+	bool player_present = false;
+	for(int i=ship_x-1;i<ship_x +2;i++)
+	{
+		for(int j=ship_y-1;j<ship_y+2;j++)
+		{
+			actor* a = map_occupants[i][j];
+			if(a != NULL)
+			{
+				if(a->is_player)
+				{
+					player_present = true;
+				}
+				else return false;
+			}
+		}
+
+	}
+	actor* a = map_occupants[ship_x-2][ship_y];
+	if(a != NULL)
+	{
+		if(a->is_player)
+		{
+			player_present = true;
+		}
+	}
+	if(map_occupants[ship_x+2][ship_y] != NULL)
+	{return false;}
+	return player_present;
 }
 
 bool win_condition()
@@ -1680,7 +1742,7 @@ void init()
 	if(has_colors() == FALSE)
 	{
 		endwin();
-		printf("Your terminal does not support color\n");
+		printf("Your terminal does not support colour\n");
 		exit(1);
 	}
     start_color();
@@ -1725,6 +1787,11 @@ inline void draw_ch(int x,int y,char ch, int col)
 {
 	attron(COLOR_PAIR(col));
 	mvaddch(1+y-viewport_top_edge(),x-viewport_left_edge(),ch);
+}
+inline void draw_ch_bright(int x,int y,char ch, int col)
+{
+	attron(COLOR_PAIR(col));
+	mvaddch(1+y-viewport_top_edge(),x-viewport_left_edge(),ch|A_BOLD);
 }
 std::string walk_description(species* sp)
 {
@@ -1963,7 +2030,49 @@ char scent_strength(float scent)
 	
 }
 
-void draw_tile(int x, int y,bool record_actors = false)
+inline bool in_vis_range(int x, int y, int xx, int yy)
+{
+	return d22(x,y,xx,yy) <= vis_range*vis_range;
+}
+
+void draw_tile(int x, int y, bool record_actors = false)
+{
+	if(!on_map(x,y))
+	{draw_ch(x,y,' ',COLOR_WHITE); return;}
+	char ch = terrain_chars[map_terrain[x][y]];
+	int colour = terrain_colours[map_terrain[x][y]];
+	if (!map_seen[x][y] && !debug)
+	{draw_ch(x,y,' ',colour); return;}
+	if(debug)
+		ch = scent_strength(map_human_scent[x][y]);
+	if (map_items[x][y] != NULL)
+	{
+		ch = map_items[x][y]->ch;
+		colour = map_items[x][y]->colour;
+	}
+	if((symmetrical_los(p_ptr->x,p_ptr->y,x,y) && in_vis_range(p_ptr->x,p_ptr->y,x,y))|| debug)
+	{
+		if (map_occupants[x][y] != NULL)
+		{
+			ch = map_occupants[x][y]->sspecies->ch;
+			colour = map_occupants[x][y]->sspecies->colour;
+			map_occupants[x][y]->sspecies->size_known = true;
+			if(map_occupants[x][y]->running) map_occupants[x][y]->sspecies->run_known = true;
+			else map_occupants[x][y]->sspecies->walk_known = true;
+			if(map_occupants[x][y] != p_ptr && record_actors)
+			{
+				visible_actors.push_back(map_occupants[x][y]);
+			}
+		}
+		draw_ch_bright(x,y,ch,colour);//ch = ch | A_BOLD;
+	}
+	else
+	{
+		draw_ch(x,y,ch,colour);
+	}
+}
+
+void draw_tile_dark(int x, int y,bool record_actors = false)
 {
 	if(!on_map(x,y))
 	{draw_ch(x,y,' ',COLOR_WHITE); return;}
@@ -2217,11 +2326,6 @@ void draw_info(int x,int y)
 	pretty_print(s);
 	getch();
 	draw_scene();
-}
-
-inline bool in_vis_range(int x, int y, int xx, int yy)
-{
-	return d22(x,y,xx,yy) <= vis_range*vis_range;
 }
 
 void kill_actor(actor* a)
@@ -2939,6 +3043,36 @@ item* select_individual_device()
 	return NULL;
 }
 
+int autotarget()
+{
+	int tab_ind = -1;
+	if(current_target == NULL || current_target == p_ptr)
+	{
+		if(visible_actors.size() == 0)
+		{
+			current_target = p_ptr;
+		}
+		else
+		{
+			current_target = visible_actors[0];
+			tab_ind = 0;
+		}
+	}
+	if(!symmetrical_los(current_target->x,current_target->y,p_ptr->x,p_ptr->y))
+	{
+		if(visible_actors.size() == 0)
+		{
+			current_target = p_ptr;
+		}
+		else
+		{
+			current_target = visible_actors[0];
+			tab_ind = 0;
+		}
+	}
+	return tab_ind;
+}
+
 void player_turn(actor* a)
 {
 	update_map_seen();
@@ -2950,7 +3084,7 @@ void player_turn(actor* a)
 		if(!forcefed_help)
 		{
 			kp = '?';
-			forcefed_help = true;
+			//forcefed_help = true;
 		}
 		else
 		{
@@ -3072,7 +3206,13 @@ void player_turn(actor* a)
 			);break;
 				}
 				page++;
-				kp = fgetch();draw_scene();
+				kp = fgetch();
+				draw_scene();
+				if(!forcefed_help && page != 4)
+				{
+					kp = '?';
+					if(page == 3) {forcefed_help = true;}
+				}
 				}
 			}break;
 		case 'X':
@@ -3109,29 +3249,10 @@ void player_turn(actor* a)
 			{
 				current_mode = THROW_MODE;
 				draw_scene();
-				int tab_ind = -1;
-				int lx = p_ptr->x; int ly = p_ptr->y;
-				if(current_target == NULL || current_target == p_ptr)
-				{
-					if(visible_actors.size() == 0)
-					{
-						current_target = p_ptr;
-					}
-					else
-					{
-						current_target = visible_actors[0];
-						tab_ind = 0;
-					}
-				}
-				if(symmetrical_los(current_target->x,current_target->y,p_ptr->x,p_ptr->y))
-				{
-				lx = current_target->x; ly = current_target->y;
-				}
-				else
-				{
-					lx = p_ptr->x; ly = p_ptr->y;
-				}
-				
+				int tab_ind = autotarget();
+				int lx = current_target->x; int ly = current_target->y;
+				item* dev = select_individual_device();
+				if(dev == NULL) break;
 			while(current_mode==THROW_MODE)
 			{
 				draw_tile_description(lx,ly);
@@ -3169,12 +3290,11 @@ void player_turn(actor* a)
 					{
 						if(los_exists(p_ptr->x,p_ptr->y,lx,ly))
 						{
-							item* dev = select_individual_device();
-						
-							if(dev != NULL)
+							//if(dev != NULL)
 							{
 								item_to_location(dev,lx,ly);
 								inv_remove(dev);
+
 								turn = 0;
 								current_mode = WALK_MODE;
 								dev->player_has = false;
@@ -3206,29 +3326,9 @@ void player_turn(actor* a)
 		{
 			current_mode = FIRE_MODE;
 			draw_scene();
-			int tab_ind = -1;
-			int lx,ly;
-			if(current_target == NULL || current_target == p_ptr)
-			{
-
-				if(visible_actors.size() == 0)
-				{
-				current_target = p_ptr;
-				}
-				else
-				{
-					current_target = visible_actors[0];
-					tab_ind = 0;
-				}
-			}
-			if(symmetrical_los(current_target->x,current_target->y,p_ptr->x,p_ptr->y))
-			{
-			lx = current_target->x; ly = current_target->y;
-			}
-			else
-			{
-				lx = p_ptr->x; ly = p_ptr->y;
-			}
+			int tab_ind = autotarget();
+			int lx = current_target->x; int ly = current_target->y;
+				
 			
 			while (current_mode == FIRE_MODE)
 			{

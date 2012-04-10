@@ -1,5 +1,6 @@
 Significant changes since 7DRL release:
 
+Updates 1 and 2:
 * Messages etc. print nicely (respecting word boundaries)
 * Radio transmitter is now cyan, for improved visibility
 * Selected weapon is coloured yellow, rather than indicated with ______
@@ -10,6 +11,8 @@ Significant changes since 7DRL release:
 * Numpad keys now work for targetting
 * Numlock may not be necessary
 * Added Q to quit the game
+
+Update 3:
 * Included frivolous easter egg that slipped my mind after day 1
 * Prevent moving off the map (after blowing up the wall)
 * Prompt to press f/t again in fire/throw mode
@@ -18,3 +21,11 @@ Significant changes since 7DRL release:
 * Prevent player from being "trapped" (escape is easy with explosives) when the ship crashes into a building
 * Automatically autotarget, don't just wait for tab
 * Made the ? help neater and less verbose
+
+Update 4:
+* Draw bright colours for visible things
+* Stop drawing things that are in LoS but out of visual range
+* Don't generate aliens with identical representations
+* Completely prevent plyer from being "trapped" (escape was still easy with explosives) when the ship crashes into a building (previous fix only prevented most suhc cases)
+* Fix autotargetting so that it doesn't get confused when the previous target is alive and out of sight
+* 
