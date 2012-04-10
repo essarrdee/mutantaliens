@@ -23,7 +23,6 @@
 /*
 allowable polish TODO:
 
-close door on entry
 if the last message happened between the player's last turn and now, colour it, or reverse??? Make message section separate, add message review command.
 pick transmitter location better
 
@@ -1771,6 +1770,8 @@ void init()
 	init_actors();
 	init_items();
 	add_message("The ship plays a cheerful tune, and the door opens. \"Automatic docking completed. Welcome to Spaceport X7/3A! Please enjoy your stay.\"");
+	std::vector<std::pair<int,int>> transmitter_options;
+
 	target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
 	int acceptable_range = 70;
 	while(map_terrain[target_x][target_y] != FLOOR || d22(ship_x,ship_y,target_x,target_y) <= squarei(acceptable_range))
@@ -2400,6 +2401,7 @@ void do_explosion(explosion ex)
 	{
 		for(int j = -ex.radius; j<= ex.radius; j++)
 		{
+			if(!on_map(ex.x+i,ex.y+j)) continue;
 			int d = d22(0,0,i,j);
 			dam = (d <= squarei(ex.radius)+1) ? (int)ceil((float)ex.centre_damage/(d+1)) : 0;
 			if(dam)
@@ -2417,11 +2419,11 @@ void do_explosion(explosion ex)
 				}
 				if(map_occupants[ex.x+i][ex.y+j] != NULL)
 				{
-					hurt_actor(map_occupants[ex.x+i][ex.y+j],dam);
 					if(map_occupants[ex.x+i][ex.y+j]->is_player)
 					{
 						add_message("You are hit by the explosion!");
 					}
+					hurt_actor(map_occupants[ex.x+i][ex.y+j],dam);
 				}
 			}
 			if(dam>=10)
@@ -2808,7 +2810,7 @@ item* selectghjk_individual_device_from_type_and_config(int type, int config)
 int ask_for_time()
 {
 	clear_area(0,0,viewport_width,1);
-	mvaddstr(0,0,"Enter time (0 to 9). q or ESC to cancel");
+	mvaddstr(0,0,"Choose delay (0 to 9 seconds). q or ESC to cancel");
 	int t = -2;
 	while(t == -2)
 	{
@@ -3159,6 +3161,8 @@ void player_turn(actor* a)
 				  "              / | \\      Wield pistol      X      "
 				  "             /  |  \\     Wield rifle       Y      "
 				  "          b/1  j/2  n/3  Wield cannon      Z      "
+				  "                         Mute advice       M      "
+				  "                         Close ship doors  C      "
 				  "               fire or //Autotarget:     tab      "
 				  "               throw   ||Manual target: movement  "
 				  "               mode    \\\\Info on tile:     i      "
