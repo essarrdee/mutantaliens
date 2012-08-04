@@ -22,10 +22,27 @@ Update 3:
 * Automatically autotarget, don't just wait for tab
 * Made the ? help neater and less verbose
 
-Update 4:
+Update 4 (ARRP 2012):
 * Draw bright colours for visible things
 * Stop drawing things that are in LoS but out of visual range
 * Don't generate aliens with identical representations
-* Completely prevent plyer from being "trapped" (escape was still easy with explosives) when the ship crashes into a building (previous fix only prevented most suhc cases)
+* Completely prevent player from being "trapped" (escape was still easy with explosives) when the ship crashes into a building (previous fix only prevented most such cases)
 * Fix autotargetting so that it doesn't get confused when the previous target is alive and out of sight
-* 
+* Allow player to close the door (but not fly away) when the transmitter is destroyed and an alien is in the ship
+* Notify player when hit by an explosion
+* Don't allow explosions at the corners of the map to break the program
+* Choose transmitter location more carefully
+* Notify when an explosion happens
+* Monsters no longer spawn in player's visual range :3
+* Ask for device time and delay before targetting throws
+* Put transparent windows in buildings, make doors opaque, randomly turn some doors into floors
+* Overhaul terrain destruction - different terrain types take different damage amounts
+* Cannon shots can destroy walls and windows (walls unreliably)
+* Add critical hits (shoot a monster several times to figure out where it's vulnerable)
+* Hologram projectors give LOS to the player, now function as spy cameras as well as distractions
+* Overhaul message display to allow partial messages in the message log.
+* Include monster health/stamina descriptions and finer stat descriptions from Mutant Aristocrats!
+* Alter sound levels to allow movement to actually be heard
+* Make monsters screech 75% less often
+* Make monsters' decision about whether to run slightly more sensible
+* Draw running monsters with capitals, draw near-death monsters in red

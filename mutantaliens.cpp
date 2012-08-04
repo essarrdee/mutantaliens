@@ -21,15 +21,73 @@
 
 #pragma warning(disable: 4996)
 /*
-allowable polish TODO:
+Scoring:
+Died: -1000
+Left the ship: 50
+Entered a building or destroyed the transmitter: 100
+Destroyed the transmitter: 200
+Entered the ship after destroying transmitter: 400
+Closed the doors: 600
+Left the planet: 800
+Ran: 
+100 per small explosive left
+400 per large explosive left
+50 per distraction left
+5 per pistol bullet left
+3 per rifle bullet left
+25 per cannon shot left
+-1 per second? per tick?
+times difficulty level
 
-if the last message happened between the player's last turn and now, colour it, or reverse??? Make message section separate, add message review command.
-pick transmitter location better
 
 */
 
 /*
+allowable polish TODO:
+
+if the last message happened between the player's last turn and now, colour it, or reverse??? Make message section separate, add message review command.
+pick transmitter location according to difficulty?
+ensure C to close doors thing in the status panel only appears when closing the doors is possible
+disallow targetting and object placement outside map bounds
+*/
+
+/*
 TODO for first non-7drl version:
+
+*rebalance distractions/monster senses to make them useful (but still not overpowered)
+*completely rescale difficulty
+*add tutorial
+  - moving
+  - killing small aliens
+    - first one dies after two hits
+	- second dies in two hits, second critical
+	- third dies in one critical hit
+  - killing medium aliens
+    - first one comes out from behind a tree next to the player, use LE (and take splash damage)
+	- second one comes out from further away, use cannon
+  - killing huge aliens
+    - run-and-gun with rifle for first one (clear some trees out) - discover weakness after a few shots
+	- ambush by 2 huge aliens - kill with HE, hurt self
+  - look for transmitter:
+    - take several steps north, find no difference in signal strength
+	- take steps west, get bad signal
+	- go east, find building, tada
+	- destroy with cannon or explosives
+*allow different keymaps: 2 or 3 hardcoded ones (easy) or otherwise (hard)
+*add cryo guy near transmitter whose AI strikes a balance between shooting aliens (if ahead of the player)
+  and getting into the ship (if behind the player or has seen ship), and is capable of navigating round obstacles to get in.
+  (surprise: very willing to take off without you)
+*completely rescale difficulty
+*add props relevant to cryo guy so the place doesn't seem dead
+*make messages, alerts, and map borders behave without weirdness
+*explain and write scores to file
+*draw sound as red lights on the border of the map display?
+*make carnivorous tentacle plants (ubiquitous galactic pest)?
+*skill sets (soldier - more health and ammo, easier to hit known criticals
+             sneak - when not running or shooting, orders of magnitude less noise and aliens only see you if you're in sight two turns in a row
+			 meditating xenobiologist - psychics don't detect you, criticals are easier to discover
+			 technician - all distractions more powerful, all devices interchangeable)
+
 
 */
 
@@ -37,7 +95,6 @@ TODO for first non-7drl version:
 REAL TODO
 make radio receiver get transmissions from ship after transmitter destroyed
 countdown to doors closing, leave a burnt hole in the ground if player is too slow (relative to difficulty)
-make critical hits
 make graduated sensitivity to smell, make alternatives for smell generator, 
 make blinding lights
 make remotes
@@ -87,12 +144,13 @@ const int NOSE = 8;
 const int CPANEL = 9;
 const int NS = 10;
 const int WE = 11;
-const int TERRAIN_TYPES = 12; //this should be 1 more than the highest terrain type
-const char terrain_chars[] = {'.','t','T','.','#','+','/','\\','<','#','|','-'};
+const int TWINDOW = 12;
+const int TERRAIN_TYPES = 13; //this should be 1 more than the highest terrain type
+const char terrain_chars[] = {'.','t','T','.','#','+','/','\\','<','#','|','-','#'};
 const int terrain_colours[] = {COLOR_GREEN,COLOR_GREEN,COLOR_GREEN,COLOR_WHITE,COLOR_WHITE,COLOR_WHITE,
-COLOR_WHITE,COLOR_WHITE,COLOR_WHITE,COLOR_WHITE,COLOR_WHITE,COLOR_WHITE};
-const char* terrain_descriptors[] = {"soil", "a small tree", "a big tree", "a paved floor", "a wall","a door","ship hull"
-"ship hull","ship hull","control panel","ship hull","ship hull"};
+COLOR_WHITE,COLOR_WHITE,COLOR_WHITE,COLOR_WHITE,COLOR_WHITE,COLOR_WHITE,COLOR_CYAN};
+const char* terrain_descriptors[] = {"soil", "a small tree", "a big tree", "a paved floor", "a wall","a door","ship hull",
+"ship hull","ship hull","control panel","ship hull","ship hull","window"};
 const char* mode_text[] = {"walk mode", "fire mode", "throw mode", "info mode"};
 const char* size_descriptors[] = {"smal", "medm", "huge"};
 const char* damage_descriptors[] = {"weak","strg"};
@@ -106,9 +164,18 @@ int current_mode = 0;
 bool cycle_advice=true;
 int current_advice=0;
 
+bool died = false;
+bool left_ship = false;
+bool ran = false;
+bool entered_building_destroyed_transmitter = false;
+bool destroyed_transmitter = false;
+bool returned_to_ship = false;
+bool closed_doors = false;
+bool left_planet = false;
+
+
 const char* const advice[] = {
    /*                              */  
-	"Press R to run!",
 	"Press R to run!",
 	"Press R to run!",
 	"Flee often!",
@@ -121,30 +188,49 @@ const char* const advice[] = {
 	"Press t to throw devices!",
 	"Press t to throw devices!",
 	"Press t to throw devices!",
+	"Press t to throw explosives!",
+	"Press t to throw explosives!",
+	"Press t to throw distractions!",
+	"Press t to throw distractions!",
 	"Use your explosives wisely!",
 	"Find the radio transmitter!",
 	"Find the radio transmitter!",
+	"Find the radio transmitter!",
+	"Find the radio transmitter!",
 	"Destroy the transmitter!",
 	"Destroy the transmitter!",
 	"Destroy the transmitter!",
+	"Don't forget where the ship is",
 	"You have explosives!",
 	"You have explosives!",
 	"You have explosives!",
 	"You have explosives!",
+	"You have explosives!",
+	"Explosives destroy walls!",
+	"Explosives destroy walls!",
+	"Explosives destroy walls!",
+	"Explosives destroy walls!",
+	"Explosives destroy trees!",
+	"Explosives destroy trees!",
+	"The cannon makes explosions!",
+	"The cannon makes explosions!",
+	"The cannon makes explosions!",
+	"The cannon can't destroy walls!",
+	"The cannon can't destroy trees!",
 	"Devices distract aliens",
 	"Devices distract aliens",
 	"Press X to use the pistol?",
 	"Press Y to use the rifle!",
-	"Press Y to use the rifle!",
 	"Press Z to use the cannon!!",
 	"Press Z to use the cannon!!",
 	"How close is the transmitter?",
+	"How close is the transmitter?",
+	"How close is the transmitter?",
+	"Press r to check for signal!",
+	"Press r to check for signal!",
 	"Press r to check for signal!",
 	"Press r to check for signal!",
 	"Can't see through big trees!",
-	"Can't see through big trees!",
-	"Can't see through big trees!",
-	"Be careful of ambushes!",
 	"Be careful of ambushes!",
 	"Trees have ears!",
 	"Trees have noses!",
@@ -153,11 +239,11 @@ const char* const advice[] = {
 	"Aliens don't carry ammo!",
 	"Aliens don't carry medkits!",
 	"Holograms distract aliens!",
+	"Holograms distract aliens!",
 	"Noise gen.s distract aliens!",
 	"Scent gen.s distract aliens!",
 	"Brain slices distract psychics",
 	"High expl.s kill huge aliens!",
-	"Low stamina means running slow",
 	"Low stamina means running slow",
 	"Low stamina means running slow"
 	
@@ -205,7 +291,8 @@ template<class T> void kill_velement(std::vector<T>& vec, T elem)
 //PANEL *map_display;
 const int disp_lines = 25;
 const int disp_columns = 80;
-const int viewport_height = 24;
+const int viewport_height = 19;
+const int message_area_height = 6;
 const int viewport_width = 49;
 int centre_x = 0;
 int centre_y = 0;
@@ -248,7 +335,7 @@ inline int d1(int x,int y,int xx,int yy)
 	return abs(x-xx)+abs(y-yy);
 }
 
-inline int d22(int x, int y, int xx, int yy)
+int d22(int x, int y, int xx, int yy)
 {
 	return (x-xx)*(x-xx)+(y-yy)*(y-yy);
 }
@@ -274,7 +361,9 @@ float randfloat()
 }
 
 std::vector<std::string> rlmessages;
+std::vector<std::string> rlmessage_words;
 int last_message_seen=0;
+int last_word_seen = 0;
 inline std::string padmsg(std::string msg)
 {
 	return msg;// + std::string(viewport_width-msg.length(),' ');
@@ -283,7 +372,195 @@ void add_message(std::string msg)
 {
 	//if(msg.length() > viewport_width) return 1;
 	rlmessages.push_back(msg);
+	std::string word_so_far = "";
+	for(unsigned int i=0; i<msg.length();i++)
+	{
+		if(msg[i] == ' ' || msg[i] == '\t' || msg[i] == '\n')
+		{
+			rlmessage_words.push_back(word_so_far);
+			word_so_far = "";
+		}
+		else
+		{
+			word_so_far = word_so_far + msg[i];
+		}
+	}
+	rlmessage_words.push_back(word_so_far);
 	//return 0;
+}
+
+void pretty_print_message_words()
+{
+	attron(COLOR_PAIR(COLOR_WHITE));
+	int line_number = message_area_height-1;
+	std::string line_so_far = "";
+	int word_number = rlmessage_words.size()-1;
+	int position = -1;
+	std::string word;
+	bool boundary_on_this_line = false;
+	int boundary_position = -1;
+	bool already_seen = (last_word_seen == rlmessage_words.size()-1);
+	while(line_number >= 0 && word_number >= 0)
+	{
+		bool next_line = false;
+		bool next_word = false;
+		if(position == -1) // start a new word
+		{
+			word = rlmessage_words[word_number];
+			position = word.length();
+		}
+		unsigned int line_chars_remaining = viewport_width - 1 - line_so_far.length();
+		if(line_chars_remaining >= position+1) // whole remainder of word fits
+		{
+			line_so_far = word.substr(0,position) + ' ' + line_so_far;
+			next_word = true;
+		}
+		else if(position >= viewport_width-1) // remainder of word couldn't possibly fit on an empty line, or exactly fits
+		{
+			line_so_far = word.substr(position-line_chars_remaining,line_chars_remaining) + ' ' + line_so_far;
+			position -= line_chars_remaining;
+			if(position == 0)
+			{
+				next_word = true;
+			}
+			next_line = true;
+		}
+		else // remainder of word would not fit on this line but would fit on an empty line
+		{
+			next_line = true;
+		}
+		if(next_word)
+		{
+			position = -1;
+			word_number--;
+			if(word_number == last_word_seen && last_word_seen != rlmessage_words.size()-1)
+			{
+				boundary_on_this_line = true;
+				boundary_position = line_so_far.length();
+				already_seen = true;
+			}
+		}
+
+
+		if(next_line)
+		{
+			if(!already_seen)
+			{
+				attron(A_BOLD);
+				mvaddstr(line_number,0,line_so_far.c_str());
+				attroff(A_BOLD);
+			}
+			else
+			{
+				if(boundary_on_this_line)
+				{
+					attroff(A_BOLD);
+					mvaddstr(line_number,0,line_so_far.substr(0,line_so_far.length()-boundary_position).c_str());
+					attron(A_BOLD);
+					mvaddstr(line_number,line_so_far.length()-boundary_position,line_so_far.substr(line_so_far.length()-boundary_position,boundary_position).c_str());
+					attroff(A_BOLD);
+					boundary_on_this_line = false;
+				}
+				else
+				{
+					attroff(A_BOLD);
+					mvaddstr(line_number,0,line_so_far.c_str());
+				}
+			}
+			line_number--;
+			line_so_far = "";
+		}
+		
+	}
+	{
+		if(!already_seen)
+		{
+			attron(A_BOLD);
+			mvaddstr(line_number,0,line_so_far.c_str());
+			attroff(A_BOLD);
+		}
+		else
+		{
+			if(boundary_on_this_line)
+			{
+				attroff(A_BOLD);
+				mvaddstr(line_number,0,line_so_far.substr(0,line_so_far.length()-boundary_position).c_str());
+				attron(A_BOLD);
+				mvaddstr(line_number,line_so_far.length()-boundary_position,line_so_far.substr(line_so_far.length()-boundary_position,boundary_position).c_str());
+				attroff(A_BOLD);
+				boundary_on_this_line = false;
+			}
+			else
+			{
+				attroff(A_BOLD);
+				mvaddstr(line_number,0,line_so_far.c_str());
+			}
+		}
+		line_number--;
+		line_so_far = "";
+	}
+	//last_word_seen  = rlmessage_words.size()-1;
+	//if(last_word_seen < (int)rlmessage_words.size())
+	//	attron(A_BOLD);
+	//unsigned int colour_change_offset = 2*viewport_width;
+	//int word_number = rlmessage_words.size()-1;
+	//int word_position = -1;
+	//for(int line = message_area_height-1; line >= 0; line--)
+	//{
+	//	std::string line_to_print;
+	//	for(line_to_print = "";
+	//		word_number >= 0 && (line_to_print.length() + rlmessage_words[word_number].length() < viewport_width
+	//		                 || (word_position != -1));
+	//		word_number--)
+	//	{
+	//		if(word_position == -1)
+	//		{
+	//			if((int)rlmessage_words[word_number].length() > viewport_width-1)
+	//			{
+	//				line_to_print = rlmessage_words[word_number].substr(rlmessage_words[word_number].length()-viewport_width+1+line_to_print.length(),viewport_width-line_to_print.length()-1)+' '+line_to_print;
+	//				word_number++;
+	//				word_position = rlmessage_words[word_number].length()-viewport_width+1+line_to_print.length();
+	//			}
+	//			else 
+	//			{
+	//				line_to_print = rlmessage_words[word_number] + ' ' + line_to_print;
+	//				if(word_number == last_word_seen)
+	//				{
+	//					colour_change_offset = line_to_print.length();
+	//				}
+	//			}
+	//		}
+	//		else
+	//		{
+	//			if(word_position > viewport_width-1)
+	//			{
+	//				line_to_print = rlmessage_words[word_number].substr(word_position - viewport_width+1,viewport_width-1);
+	//				word_number++;
+	//				word_position = word_position - viewport_width+1;
+	//			}
+	//			else
+	//			{
+	//				line_to_print = rlmessage_words[word_number].substr(0,word_position);
+	//				word_position = -1;
+	//			}
+	//		}
+	//	}
+	//	if(colour_change_offset != 2*viewport_width)
+	//	{
+	//		attroff(A_BOLD);
+	//		mvaddstr(line,0,line_to_print.substr(0,line_to_print.length()-colour_change_offset).c_str());
+	//		attron(A_BOLD);
+	//		mvaddstr(line,line_to_print.length()-colour_change_offset,line_to_print.substr(line_to_print.length()-colour_change_offset).c_str());
+	//		attroff(A_BOLD);
+	//		colour_change_offset = 2*viewport_width;
+	//	}
+	//	else
+	//	{
+	//		mvaddstr(line,0,line_to_print.c_str());
+	//	}
+	//}
+	////last_word_seen  = rlmessage_words.size();
+	//attroff(A_BOLD);
 }
 
 void pretty_print(std::string s)
@@ -373,16 +650,25 @@ void draw_text_wodge(std::string s)
 	//getch();
 }
 
+void clear_area(int x,int y,int xr,int yr)
+{
+	for(int i=y;i<y+yr;i++)
+		mvaddstr(i,x,std::string(xr,' ').c_str());
+}
+
 void draw_last_msg()
 {
 	//attron(COLOR_PAIR(COLOR_WHITE));
-	std::string s = "";
+	clear_area(0,0,viewport_width,message_area_height+1);
+	pretty_print_message_words();
+	/*std::string s = "";
 	for(unsigned int i = last_message_seen; i < rlmessages.size(); i++)
 	{
 		s += rlmessages[i]; s += " ";
 	}
 	pretty_print(s);
-	last_message_seen = std::max(last_message_seen,(int)rlmessages.size()-2);
+	last_message_seen = std::max(last_message_seen,(int)rlmessages.size()-2);*/
+	last_word_seen  = (int)rlmessage_words.size()-1;
 	//mvaddstr(0,0,padmsg(rlmessages.back()).c_str());
 }
 
@@ -392,9 +678,9 @@ struct noise
 	std::string describe;
 	bool scary;
 };
-noise LE_noise = {30.0,"explosion",true};
-noise HE_noise = {60.0,"big explosion",true};
-noise screech = {15.0,"screech",false};
+noise LE_noise = {25.0,"explosion",true};
+noise HE_noise = {31.0,"big explosion",true};
+noise screech = {15.0f,"screech",false};
 std::vector<std::vector<noise>> walk_noise(ZOO_SIZE+1,std::vector<noise>(TERRAIN_TYPES));
 std::vector<std::vector<noise>> run_noise(ZOO_SIZE+1,std::vector<noise>(TERRAIN_TYPES));
 noise fake_human_noise[2] = {{10.0f,"\"HELLO?\"",false},{10.0,"\"I'M MADE OF FOOD!\"",false}};
@@ -416,6 +702,9 @@ struct species
 	int run_energy;
 	int stamina;
 	int size;
+	int body_sections;
+	int body_sections_tried;
+	bool crit_known;
 	bool damage_known;
 	bool health_known;
 	bool walk_known;
@@ -425,6 +714,7 @@ struct species
 	noise melee_noise;
 	std::string syl1, syl2, name;
 	std::string description;
+	std::string crit_part_name;
 };
 
 inline int viewport_left_edge()
@@ -437,19 +727,15 @@ inline int viewport_right_edge()
 }
 inline int viewport_top_edge()
 {
-	return centre_y-viewport_height/2;
+	return centre_y-viewport_height/2+1;
 }
 inline int viewport_bottom_edge()
 {
-	return centre_y+viewport_height/2;
-}
-void clear_area(int x,int y,int xr,int yr)
-{
-	for(int i=y;i<y+yr;i++)
-		mvaddstr(i,x,std::string(xr,' ').c_str());
+	return centre_y+viewport_height/2+1;
 }
 
 std::vector<species*> zoo;
+
 species* average[3];
 species* human_sp;
 
@@ -533,7 +819,7 @@ void init_species()
 	human->health_range = 0; human->min_health = 100;
 	human->ch = '@';
 	human->psychic_range=0; human->hearing_thres = 1.0f;
-	human->hearing_adapt = 0.3f;
+	human->hearing_adapt = 0.5f;
 	human->smell_clarity = 0.1f; human->vis_range = 8;
 	human->syl1 = "hu"; human->syl2 = "man";
 	human->name = "human";
@@ -542,6 +828,10 @@ void init_species()
 	human->walk_energy = 10;
 	human->run_energy = 19;
 	human->stamina = 1200;
+	human->body_sections = 7;
+	human->body_sections_tried = human->body_sections - 1;
+	human->crit_part_name = "head";
+	human->crit_known = true;
 	human->size = 1;
 	noise wn[TERRAIN_TYPES] = {{1.0,"footsteps",false},{1.5,"footsteps",false},{1.5f,"footsteps",false},{2.0,"footsteps",false},{0.0,"",false},
 	{2.3f,"footsteps",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false}};
@@ -556,7 +846,7 @@ void init_species()
 	human->description = "A legendary advanced alien race whose technology is built specifically for murder, ecological destruction, deception, and gentle shaking. Members of this species must be killed immediately upon discovery to prevent catastrophic damage to the whole area.";
 	zoo.push_back(human);
 	human_sp = human;
-	for (int spsp=0; spsp<ZOO_SIZE; spsp++)
+	for (int spsp=1; spsp<ZOO_SIZE+1; spsp++)
 	{
 		species* alien = new species();
 		alien->damage_known = false;
@@ -565,17 +855,19 @@ void init_species()
 		alien->walk_known = false;
 		alien->run_known = false;
 		alien->id = spsp;
+		alien->crit_known = false;
+		alien->body_sections_tried = 0;
 		int size = rand()%3;
-		if(spsp == ZOO_SIZE -1) size = 2;
-		else if(spsp==ZOO_SIZE - 2) size = 1;
-		else if(spsp==ZOO_SIZE-3) size = 0;
+		if(spsp == ZOO_SIZE) size = 2;
+		else if(spsp==ZOO_SIZE - 1) size = 1;
+		else if(spsp==ZOO_SIZE - 2) size = 0;
 		alien->syl1 = random_syllable();
 		while(true)
 		{
 			bool ok_name = true;
-			for (int spspsp = 0; spspsp < spsp; spspsp++)
+			for (int spspsp = 1; spspsp < spsp; spspsp++)
 			{
-				if(zoo[spspsp+1]->ch == alien->syl1[0] && zoo[spspsp+1]->size == alien->size)
+				if(zoo[spspsp]->ch == alien->syl1[0])
 				{
 					ok_name = false;
 					alien->syl1 = random_syllable();
@@ -599,6 +891,7 @@ void init_species()
 		std::string walk_str;
 		std::string run_str;
 		float extra_noise;
+		alien->crit_part_name = random_syllable();
 		switch(size)
 		{
 		case 0:
@@ -606,9 +899,14 @@ void init_species()
 			alien->damage = rand()%2+2;
 			alien->min_health = 4+rand()%4;
 			alien->health_range = rand()%2+1;
+			alien->body_sections = 3+rand()%4;
 
-			if(rand()%7<1+difficulty/3)
+			if(rand()%12<1+difficulty/3)
 			{ alien->psychic_range = rand()%20+10; }
+			else
+			{
+				alien->psychic_range = 0;
+			}
 
 			switch(rand()%7)
 			{
@@ -662,15 +960,15 @@ void init_species()
 			case 2:
 				run_str = "fluttering";
 			}
-			extra_noise = -4.0;
+			extra_noise = 7.0f;
 			walk_noise[spsp] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
 			run_noise[spsp] = std::vector<noise>(rn,rn+TERRAIN_TYPES);
 			for(int i=0;i<TERRAIN_TYPES;i++)
 			{
 				walk_noise[spsp][i].describe = walk_str;
 				walk_noise[spsp][i].volume +=extra_noise;
-				walk_noise[spsp][i].describe = run_str;
-				walk_noise[spsp][i].volume +=extra_noise;
+				run_noise[spsp][i].describe = run_str;
+				run_noise[spsp][i].volume +=extra_noise*1.6f;
 			}
 			break;
 		case 1:
@@ -678,9 +976,14 @@ void init_species()
 			alien->damage = rand()%6+4;
 			alien->min_health = 10+rand()%6;
 			alien->health_range = rand()%4+4;
+			alien->body_sections = 6+rand()%8;
 
-			if(rand()%7<2+(difficulty-3)/3)
+			if(rand()%12<2+(difficulty-3)/3)
 			{ alien->psychic_range = rand()%30+20; }
+			else
+			{
+				alien->psychic_range = 0;
+			}
 
 			switch(rand()%7)
 			{
@@ -731,18 +1034,18 @@ void init_species()
 			{
 			case 0:
 				run_str = "galloping"; break;
-			case 2: 
+			case 1: 
 				run_str = "running"; break;
 			}
-			extra_noise = 0.0;
+			extra_noise = 9.0f;
 			walk_noise[spsp] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
 			run_noise[spsp] = std::vector<noise>(rn,rn+TERRAIN_TYPES);
 			for(int i=0;i<TERRAIN_TYPES;i++)
 			{
 				walk_noise[spsp][i].describe = walk_str;
 				walk_noise[spsp][i].volume +=extra_noise;
-				walk_noise[spsp][i].describe = run_str;
-				walk_noise[spsp][i].volume +=extra_noise;
+				run_noise[spsp][i].describe = run_str;
+				run_noise[spsp][i].volume +=extra_noise*1.6f;
 			}
 			break;
 		case 2:
@@ -750,9 +1053,14 @@ void init_species()
 			alien->damage = rand()%8+8;
 			alien->min_health = 20+rand()%10;
 			alien->health_range = rand()%7+5;
+			alien->body_sections = 9+rand()%16;
 
-			if(rand()%7<3+(difficulty/5))
+			if(rand()%12<3+(difficulty/5))
 			{ alien->psychic_range = rand()%30+20; }
+			else
+			{
+				alien->psychic_range = 0;
+			}
 
 			switch(rand()%7)
 			{
@@ -804,15 +1112,15 @@ void init_species()
 			case 0:
 				run_str = "charging"; break;
 			}
-			extra_noise = 4.0;
+			extra_noise = 11.5f;
 			walk_noise[spsp] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
 			run_noise[spsp] = std::vector<noise>(rn,rn+TERRAIN_TYPES);
 			for(int i=0;i<TERRAIN_TYPES;i++)
 			{
 				walk_noise[spsp][i].describe = walk_str;
 				walk_noise[spsp][i].volume +=extra_noise;
-				walk_noise[spsp][i].describe = run_str;
-				walk_noise[spsp][i].volume +=extra_noise;
+				run_noise[spsp][i].describe = run_str;
+				run_noise[spsp][i].volume +=extra_noise*1.6f;
 			}
 		}
 		/*char buf[1000] = "";
@@ -859,21 +1167,31 @@ actor* map_occupants[MAP_SIZE][MAP_SIZE];
 bool terrain_immovable(actor* a, int x, int y)
 {
 	if(!on_map(x,y)) return false;
-	if (map_terrain[x][y] == WALL || map_terrain[x][y] == NW_SE|| map_terrain[x][y] == SW_NE
+	if (map_terrain[x][y] == WALL || map_terrain[x][y] == NW_SE|| map_terrain[x][y] == SW_NE || map_terrain[x][y] == TWINDOW
 		|| map_terrain[x][y] == NS || map_terrain[x][y] == WE || map_terrain[x][y] == NOSE || map_terrain[x][y] == CPANEL) return true;
 	if (map_occupants[x][y] != NULL && map_occupants[x][y] != a) return true;
 	return false;
 }
 
-std::pair<int,int> random_occupiable_square()
+std::pair<int,int> random_occupiable_square_away_from_player()
 {
 	int target_x = rand()%MAP_SIZE; int target_y = rand()%MAP_SIZE;
-	while(map_terrain[target_x][target_y])
+	while((map_terrain[target_x][target_y] != DIRT && map_terrain[target_x][target_y] != FLOOR) || d22(target_x,target_y,p_ptr->x,p_ptr->y) <= (vis_range+2)*(vis_range+2))
 	{
 		target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
 	}
 	return std::make_pair(target_x,target_y);
 }
+
+//std::pair<int,int> random_occupiable_square()
+//{
+//	int target_x = rand()%MAP_SIZE; int target_y = rand()%MAP_SIZE;
+//	while(map_terrain[target_x][target_y])
+//	{
+//		target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
+//	}
+//	return std::make_pair(target_x,target_y);
+//}
 
 struct item
 {
@@ -1075,7 +1393,7 @@ void item_to_location(item* a, int x, int y)
 	else
 	{
 		add_message("Abnormal item placement! Maybe it's in a wall, maybe it just squashed another item.");
-		draw_last_msg();
+		//draw_last_msg();
 		map_items[x][y] = a;
 		a->x = x; a->y = y;
 	}
@@ -1176,7 +1494,11 @@ void make_room(std::pair<int,int> centre, std::pair<int,int> size)
 			}
 			else
 			{
-				if(map_terrain[i+x-xsize/2][j+y-ysize/2] != WALL && map_terrain[i+x-xsize/2][j+y-ysize/2] != DOOR)
+				if(map_terrain[i+x-xsize/2][j+y-ysize/2] != WALL && map_terrain[i+x-xsize/2][j+y-ysize/2] != DOOR && map_terrain[i+x-xsize/2][j+y-ysize/2] != TWINDOW)
+				{
+					map_terrain[i+x-xsize/2][j+y-ysize/2] = FLOOR;
+				}
+				else if(map_terrain[i+x-xsize/2][j+y-ysize/2] == DOOR && rand()%3 == 0)
 				{
 					map_terrain[i+x-xsize/2][j+y-ysize/2] = FLOOR;
 				}
@@ -1187,23 +1509,65 @@ void make_room(std::pair<int,int> centre, std::pair<int,int> size)
 			}
 		}
 	}
-	if(inner_walls.size()>0)
+	if(inner_walls.size()>0) // this should really be done with shuffle
 	{
-		std::pair<int,int> inner_door_choice = inner_walls[rand()%inner_walls.size()];
+		int door_id = rand()%inner_walls.size();
+		std::pair<int,int> inner_door_choice = inner_walls[door_id];
 		map_access[inner_door_choice.first+1][inner_door_choice.second] = true;
 		map_access[inner_door_choice.first-1][inner_door_choice.second] = true;
 		map_access[inner_door_choice.first][inner_door_choice.second+1] = true;
 		map_access[inner_door_choice.first][inner_door_choice.second-1] = true;
 		map_terrain[inner_door_choice.first][inner_door_choice.second] = DOOR;
+		if(inner_walls.size() > 2)
+		{
+			int w1_id = rand()%inner_walls.size();
+			while(w1_id == door_id)
+			{
+				w1_id = rand()%inner_walls.size();
+			}
+			std::pair<int,int> w1_choice = inner_walls[w1_id];
+			map_terrain[w1_choice.first][w1_choice.second] = TWINDOW;
+			if(inner_walls.size() > 4)
+			{
+				int w2_id = rand()%inner_walls.size();
+				while(w2_id == door_id || w2_id == w1_id)
+				{
+					w2_id = rand()%inner_walls.size();
+				}
+				std::pair<int,int> w2_choice = inner_walls[w2_id];
+				map_terrain[w2_choice.first][w2_choice.second] = TWINDOW;
+				}
+		}
 	}
 	if(outer_walls.size()>0)
 	{
-		std::pair<int,int> outer_door_choice = outer_walls[rand()%outer_walls.size()];
+		int door_id = rand()%outer_walls.size();
+		std::pair<int,int> outer_door_choice = outer_walls[door_id];
 		map_terrain[outer_door_choice.first][outer_door_choice.second] = DOOR;
 		map_access[outer_door_choice.first+1][outer_door_choice.second] = true;
 		map_access[outer_door_choice.first-1][outer_door_choice.second] = true;
 		map_access[outer_door_choice.first][outer_door_choice.second+1] = true;
 		map_access[outer_door_choice.first][outer_door_choice.second-1] = true;
+		if(outer_walls.size() > 2)
+		{
+			int w1_id = rand()%outer_walls.size();
+			while(w1_id == door_id)
+			{
+				w1_id = rand()%outer_walls.size();
+			}
+			std::pair<int,int> w1_choice = outer_walls[w1_id];
+			map_terrain[w1_choice.first][w1_choice.second] = TWINDOW;
+			if(outer_walls.size() > 4)
+			{
+				int w2_id = rand()%outer_walls.size();
+				while(w2_id == door_id || w2_id == w1_id)
+				{
+					w2_id = rand()%outer_walls.size();
+				}
+				std::pair<int,int> w2_choice = outer_walls[w2_id];
+				map_terrain[w2_choice.first][w2_choice.second] = TWINDOW;
+				}
+		}
 	}
 
 }
@@ -1311,9 +1675,8 @@ void draw_ship(int x,int y)
 	}
 
 }
-bool door_closable()
+bool player_in_ship()
 {
-	if (!transmitter_destroyed) return false;
 	bool player_present = false;
 	for(int i=ship_x-1;i<ship_x +2;i++)
 	{
@@ -1338,9 +1701,24 @@ bool door_closable()
 			player_present = true;
 		}
 	}
+	return player_present;
+}
+
+void check_achievements()
+{
+	if(!player_in_ship()) {left_ship = true;}
+	if(map_terrain[p_ptr->x][p_ptr->y] == FLOOR && !player_in_ship()) {entered_building_destroyed_transmitter = true;}
+	if(destroyed_transmitter && player_in_ship()) {returned_to_ship = true;}
+}
+
+bool door_closable()
+{
+	//return (bool)(turn_count % 2);
+	if (!transmitter_destroyed) return false;
+	
 	if(map_occupants[ship_x+2][ship_y] != NULL)
 	{return false;}
-	return player_present;
+	return player_in_ship();
 }
 
 bool win_condition()
@@ -1523,12 +1901,12 @@ void init_map()
 
 void init_actors()
 {
-	std::pair<int,int> ploc = random_occupiable_square();
-	ploc = random_occupiable_square();
 	p_ptr = add_actor(zoo[0],true,ship_x,ship_y);
+	std::pair<int,int> ploc;// = random_occupiable_square();
+	//ploc = random_occupiable_square_away_from_player();
 	for(int i=0;i<10+difficulty;i++)
 	{
-		ploc = random_occupiable_square();
+		ploc = random_occupiable_square_away_from_player();
 		add_actor(zoo[(rand()%ZOO_SIZE)+1],false,ploc.first,ploc.second);
 	}
 
@@ -1547,14 +1925,21 @@ bool is_wall(int x, int y)
 
 bool undiffusable(int x, int y)
 {
-	return (map_terrain[x][y] == WALL || map_terrain[x][y] == SW_NE || map_terrain[x][y] == NW_SE || map_terrain[x][y] == NS || map_terrain[x][y] == WE || map_terrain[x][y] == CPANEL || map_terrain[x][y] == NOSE);
+	return (map_terrain[x][y] == WALL || map_terrain[x][y] == SW_NE || map_terrain[x][y] == NW_SE || map_terrain[x][y] == NS || map_terrain[x][y] == WE || map_terrain[x][y] == CPANEL || map_terrain[x][y] == NOSE || map_terrain[x][y] == TWINDOW);
+}
+
+bool blocks_shots(int x, int y)
+{
+	if(!on_map(x,y)) return true;
+	return map_terrain[x][y] == WALL || map_terrain[x][y] == BTREE|| map_terrain[x][y] == NW_SE|| map_terrain[x][y] == SW_NE || map_terrain[x][y] == TWINDOW
+		|| map_terrain[x][y] == NS || map_terrain[x][y] == WE || map_terrain[x][y] == NOSE || map_terrain[x][y] == CPANEL || map_terrain[x][y] == DOOR;
 }
 
 bool is_opaque(int x, int y)
 {
 	if(!on_map(x,y)) return true;
 	return map_terrain[x][y] == WALL || map_terrain[x][y] == BTREE|| map_terrain[x][y] == NW_SE|| map_terrain[x][y] == SW_NE
-		|| map_terrain[x][y] == NS || map_terrain[x][y] == WE || map_terrain[x][y] == NOSE || map_terrain[x][y] == CPANEL;
+		|| map_terrain[x][y] == NS || map_terrain[x][y] == WE || map_terrain[x][y] == NOSE || map_terrain[x][y] == CPANEL || map_terrain[x][y] == DOOR;
 }
 
 void update_device_desciption(item* dev)
@@ -1604,7 +1989,7 @@ item* add_device(int type,int x,int y,bool in_inv)
 		break;
 	case 2:
 		dev->name = "hologram projector";
-		dev->description = "Projects holograms that confuse or blind creatures that rely on sight. Such as you.";
+		dev->description = "Projects holograms that confuse creatures that rely on sight. Such as you.";
 		dev->ch = 'C';
 		break;
 	case 3:
@@ -1615,11 +2000,11 @@ item* add_device(int type,int x,int y,bool in_inv)
 	case 4:
 		dev->name = "scent generator";
 		dev->ch = 'E';
-		dev->description = "Confuses or causes nausea in creatures with a sense of smell. For instance, you.";
+		dev->description = "Confuses creatures with a sense of smell. For instance... your dog.";
 		break;
 	case 5:
 		dev->name = "brain slice";
-		dev->description = "Confuses or frightens creatures with a psychic sense. Like that guy from the infotainment datalinks.";
+		dev->description = "Confuses creatures with a psychic sense. Like that guy from the infotainment datalinks.";
 		dev->ch = 'F';
 		break;
 	default:
@@ -1771,14 +2156,29 @@ void init()
 	init_items();
 	add_message("The ship plays a cheerful tune, and the door opens. \"Automatic docking completed. Welcome to Spaceport X7/3A! Please enjoy your stay.\"");
 	std::vector<std::pair<int,int>> transmitter_options;
-
-	target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
 	int acceptable_range = 70;
-	while(map_terrain[target_x][target_y] != FLOOR || d22(ship_x,ship_y,target_x,target_y) <= squarei(acceptable_range))
+	while(transmitter_options.size() == 0)
+	{
+		for(int x = 0; x < MAP_SIZE; x++)
+		{
+			for(int y = 0; y < MAP_SIZE; y++)
+			{
+				if(map_terrain[x][y] == FLOOR && d22(x,y,ship_x, ship_y) > acceptable_range*acceptable_range)
+					transmitter_options.push_back(std::make_pair(x,y));
+			}
+		}
+		acceptable_range--;
+	}
+
+	std::pair<int,int> target_pair = transmitter_options[rand()%transmitter_options.size()];
+	target_x = target_pair.first; target_y = target_pair.second;
+	//target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
+	
+	/*while(map_terrain[target_x][target_y] != FLOOR || d22(ship_x,ship_y,target_x,target_y) <= squarei(acceptable_range))
 	{
 		target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
 		if(rand()%4 != 0) acceptable_range--;
-	}
+	}*/
 	add_junk("radio transmitter","So this is what's been causing you so much trouble!",'?',COLOR_CYAN,target_x,target_y);
 }
 
@@ -1787,17 +2187,18 @@ void init()
 inline void draw_ch(int x,int y,char ch, int col)
 {
 	attron(COLOR_PAIR(col));
-	mvaddch(1+y-viewport_top_edge(),x-viewport_left_edge(),ch);
+	mvaddch(message_area_height+1+y-viewport_top_edge(),x-viewport_left_edge(),ch);
 }
 inline void draw_ch_bright(int x,int y,char ch, int col)
 {
 	attron(COLOR_PAIR(col));
-	mvaddch(1+y-viewport_top_edge(),x-viewport_left_edge(),ch|A_BOLD);
+	mvaddch(message_area_height+y+1-viewport_top_edge(),x-viewport_left_edge(),ch|A_BOLD);
 }
 std::string walk_description(species* sp)
 {
 	if(!sp->walk_known) return "    ";
-	if(sp->walk_energy > human_sp->walk_energy) return "fast";
+	if(sp->walk_energy > human_sp->run_energy) return "vfst";
+	else if(sp->walk_energy > human_sp->walk_energy) return "fast";
 	else if(sp->walk_energy < human_sp->walk_energy) return "slow";
 	return "avrg";
 }
@@ -1805,6 +2206,7 @@ std::string run_description(species* sp)
 {
 	if(!sp->run_known) return "    ";
 	if(sp->run_energy > human_sp->run_energy) return "fast";
+	else if(sp->run_energy < human_sp->walk_energy) return "vslw";
 	else if(sp->run_energy < human_sp->run_energy) return "slow";
 	return "avrg";
 }
@@ -1813,13 +2215,23 @@ std::string damage_description(species* sp)
 	if(!sp->damage_known) return "    ";
 	if(sp->damage <= 4) return "weak";
 	if(sp->damage <= 8) return "strg";
-	return "dngr";
+	if(sp->damage <= 14) return "dngr";
+	return "argh";
 }
 std::string health_description(species* sp)
 {
 	if(!sp->health_known) return "     ";
-	if(sp->min_health <= 6) return "frail";
-	return "tough";
+	if(sp->min_health <= 4) return "fethr";
+	if(sp->min_health <= 8) return "frail";
+	else if(sp->min_health <= 14) return " avrg";
+	else if(sp->min_health <= 22) return "tough";
+	else if(sp->min_health <= 36) return "v tgh";
+	return "vvtgh";
+}
+std::string crit_description(species* sp)
+{
+	if(sp->crit_known) return "*";
+	return " ";;
 }
 std::string size_description(species* sp)
 {
@@ -1829,7 +2241,7 @@ std::string size_description(species* sp)
 void draw_memory()
 {
 	attron(COLOR_PAIR(COLOR_WHITE));
-	mvaddstr(10,viewport_width+1,"M size walk  run  dmg  hlth");
+	mvaddstr(10,viewport_width+1,"M size walk  run  dmg  hlth cr");
 	for(int i=11;i<11+ZOO_SIZE;i++)
 	{
 		species* sp = zoo[i-10];
@@ -1840,7 +2252,7 @@ void draw_memory()
 		attron(COLOR_PAIR(COLOR_WHITE));
 		mvaddstr(i, viewport_width+1+2, (size_description(sp)+" "+
 			walk_description(sp)+" "+run_description(sp)+" "+damage_description(sp)+
-			" "+health_description(sp)).c_str());
+			" "+health_description(sp)+" "+crit_description(sp)).c_str());
 	}
 }
 void draw_stats()
@@ -1851,7 +2263,7 @@ void draw_stats()
 	//{
 	//	mvaddstr(i,viewport_width+1,std::string(disp_columns-viewport_width-1,' ').c_str());
 	//}
-	clear_area(viewport_width+1,3,disp_columns-viewport_width-1,14+ZOO_SIZE);
+	clear_area(viewport_width+1,3,disp_columns-viewport_width-1,15+ZOO_SIZE);
 	mvprintw(3,(viewport_width+1),"HP: %d/%d %s    ",p_ptr->health,p_ptr->sspecies->min_health,
 		p_ptr->running?"running":"       ");
 	/*mvprintw(4,(viewport_width+1),(std::string("     ")+
@@ -1874,7 +2286,7 @@ void draw_stats()
 	attron(COLOR_PAIR(COLOR_WHITE));
 	printw("%s stamina", std::string(10*p_ptr->stamina / p_ptr->sspecies->stamina,'*').c_str());
 	mvprintw(8,(viewport_width+1),"Devic LEx HEx Hol Noi Sce Brn");
-	mvprintw(9,(viewport_width+1),"Count A%2d B%2d C%2d D%2d E%2d F%2d",
+	mvprintw(9,(viewport_width+1),"Count  %2d  %2d  %2d  %2d  %2d  %2d",
 		count_inv_devices(LOW_EXPLOSIVE),count_inv_devices(HIGH_EXPLOSIVE),
 		count_inv_devices(HOLOGRAM_PROJECTOR),count_inv_devices(NOISE_GENERATOR),
 		count_inv_devices(SCENT_GENERATOR),count_inv_devices(BRAIN_SLICE));
@@ -1903,9 +2315,7 @@ void draw_stats()
 	draw_memory();
 }
 
-
-
-bool los_exists(int x1, int y1, int x2, int y2)
+bool los_exists(int x1, int y1, int x2, int y2, bool (*opacity_test)(int,int))
 {
     // if x1 == x2 or y1 == y2, then it does not matter what we set here
     int delta_x(x2 - x1);
@@ -1938,7 +2348,7 @@ bool los_exists(int x1, int y1, int x2, int y2)
             error += delta_y;
 			if (x1 != x2)//(x1 != x2 && y1 != y2)
 			{
-				if (is_opaque(x1, y1)) return false;
+				if (opacity_test(x1, y1)) return false;
 			}
         }
     }
@@ -1965,16 +2375,16 @@ bool los_exists(int x1, int y1, int x2, int y2)
  
             if (y1 != y2)//(x1 != x2 && y1 != y2)
 			{
-				if (is_opaque(x1, y1)) return false;
+				if (opacity_test(x1, y1)) return false;
 			}
         }
     }
 	return true;
 }
 
-bool symmetrical_los(int x1, int y1, int x2, int y2)
+bool symmetrical_los(int x1, int y1, int x2, int y2,bool (* opacity_test)(int,int))
 {
-	return (los_exists(x1, y1, x2, y2) || los_exists(x2, y2, x1, y1));
+	return (los_exists(x1, y1, x2, y2,opacity_test) || los_exists(x2, y2, x1, y1,opacity_test));
 }
 
 inline bool in_vis_range(int x, int y, int xx, int yy)
@@ -1982,9 +2392,24 @@ inline bool in_vis_range(int x, int y, int xx, int yy)
 	return d22(x,y,xx,yy) <= vis_range*vis_range;
 }
 
-inline bool sym_los_in_range(int x1, int y1, int x2, int y2)
+inline bool sym_los_in_range(int x1, int y1, int x2, int y2,bool (*opacity_test)(int,int))
 {
-	return symmetrical_los(x1,y1,x2,y2) && in_vis_range(x1,y1,x2,y2);
+	return symmetrical_los(x1,y1,x2,y2,opacity_test) && in_vis_range(x1,y1,x2,y2);
+}
+
+bool tile_visible(int x, int y)
+{
+	if (debug) return true;
+	if(sym_los_in_range(p_ptr->x,p_ptr->y,x,y,is_opaque)) return true;
+	for(unsigned int i=0; i<active_devices.size(); i++)
+	{
+		//if(active_devices[i]->device_type == HOLOGRAM_PROJECTOR) // put spy cameras on *all* devices
+		{
+			if(sym_los_in_range(active_devices[i]->x,active_devices[i]->y,x,y,is_opaque)) return true;
+		}
+	}
+	return false;
+
 }
 
 void draw_tile_description(int x, int y)
@@ -2009,7 +2434,8 @@ void draw_tile_description(int x, int y)
 		}
 		if (map_occupants[x][y] != NULL)
 		{
-			if(sym_los_in_range(p_ptr->x,p_ptr->y,x,y) || debug)
+			//if(sym_los_in_range(p_ptr->x,p_ptr->y,x,y,is_opaque) || debug)
+			if(tile_visible(x,y))
 			{
 				attron(COLOR_PAIR(map_occupants[x][y]->sspecies->colour));
 				mvaddstr(2,(viewport_width+1),(map_occupants[x][y]->sspecies->name +
@@ -2060,18 +2486,26 @@ void draw_tile(int x, int y, bool record_actors = false)
 		ch = map_items[x][y]->ch;
 		colour = map_items[x][y]->colour;
 	}
-	if(sym_los_in_range(p_ptr->x,p_ptr->y,x,y)|| debug)
+	//if(sym_los_in_range(p_ptr->x,p_ptr->y,x,y,is_opaque)|| debug)
+	if(tile_visible(x,y))
 	{
 		if (map_occupants[x][y] != NULL)
 		{
-			ch = map_occupants[x][y]->sspecies->ch;
-			colour = map_occupants[x][y]->sspecies->colour;
-			map_occupants[x][y]->sspecies->size_known = true;
-			if(map_occupants[x][y]->running) map_occupants[x][y]->sspecies->run_known = true;
-			else map_occupants[x][y]->sspecies->walk_known = true;
-			if(map_occupants[x][y] != p_ptr && record_actors)
+			actor* a = map_occupants[x][y];
+			ch = a->sspecies->ch;
+			if('a'<= ch && ch <= 'z' && a->running)
 			{
-				visible_actors.push_back(map_occupants[x][y]);
+				ch -= ('a'-'A');
+			}
+			colour = a->sspecies->colour;
+			if(a->health < a->sspecies->min_health/4)
+			{colour = COLOR_RED;}
+			a->sspecies->size_known = true;
+			if(a->running) a->sspecies->run_known = true;
+			else a->sspecies->walk_known = true;
+			if(a != p_ptr && record_actors)
+			{
+				visible_actors.push_back(a);
 			}
 		}
 		draw_ch_bright(x,y,ch,colour);//ch = ch | A_BOLD;
@@ -2122,7 +2556,7 @@ void draw_line(int x1, int y1, int x2, int y2, char ch)
 	int col = COLOR_BLUE;
 	if(on_map(x2,y2))
 	{
-		if(map_occupants[x2][y2] != NULL && sym_los_in_range(x1,y1,x2,y2))
+		if(map_occupants[x2][y2] != NULL && sym_los_in_range(x1,y1,x2,y2,blocks_shots))
 		{
 			col = COLOR_CYAN;
 		}
@@ -2157,7 +2591,7 @@ void draw_line(int x1, int y1, int x2, int y2, char ch)
  
             x1 += ix;
             error += delta_y;
-			if (is_opaque(x1,y1)) {col = COLOR_RED;}
+			if (blocks_shots(x1,y1)) {col = COLOR_RED;}
 			draw_ch(x1,y1,ch,col);
         }
     }
@@ -2181,7 +2615,7 @@ void draw_line(int x1, int y1, int x2, int y2, char ch)
  
             y1 += iy;
             error += delta_x;
-			if (is_opaque(x1,y1)) {col = COLOR_RED;}
+			if (blocks_shots(x1,y1)) {col = COLOR_RED;}
 			draw_ch(x1,y1,ch,col);
         }
     }
@@ -2254,10 +2688,10 @@ void draw_scene(bool record_actors=false)
 {
 	
 	draw_tile_description(p_ptr->x,p_ptr->y);
-	centre_x = std::min(p_ptr->x,MAP_SIZE - viewport_width/2);
+	centre_x = std::min(p_ptr->x,MAP_SIZE - viewport_width/2-1);
 	centre_x = std::max(centre_x,viewport_width/2);
-	centre_y = std::min(p_ptr->y,MAP_SIZE - viewport_height/2);
-	centre_y = std::max(centre_y,viewport_height/2);
+	centre_y = std::min(p_ptr->y,MAP_SIZE - viewport_height/2-1);
+	centre_y = std::max(centre_y,viewport_height/2-1);
 	for(int x=viewport_left_edge();x<=viewport_right_edge(); x++)
 	{
 		for(int y=viewport_top_edge();y<viewport_bottom_edge(); y++)
@@ -2303,11 +2737,11 @@ int move_actor(actor* a, int dx, int dy)
 	a->x = x; a->y = y;
 	if(a->running)
 	{
-		make_noise(x,y,&walk_noise[a->sspecies->id][map_terrain[x][y]]);
+		make_noise(x,y,&run_noise[a->sspecies->id][map_terrain[x][y]]);
 	}
 	else
 	{
-		make_noise(x,y,&run_noise[a->sspecies->id][map_terrain[x][y]]);
+		make_noise(x,y,&walk_noise[a->sspecies->id][map_terrain[x][y]]);
 	}
 	return 0;
 }
@@ -2331,8 +2765,24 @@ void draw_info(int x,int y)
 		s += map_items[x][y]->description;
 	}
 	if(map_occupants[x][y] != NULL)
+	{
+		actor* a = map_occupants[x][y];
 	//mvprintw(0,0,map_occupants[x][y]->sspecies->description.c_str());
-	s += map_occupants[x][y]->sspecies->description;
+		s += a->sspecies->description;
+		if(a->running) s += " It is running.";
+		if(a->stamina < a->sspecies->stamina/4) s+= " It looks exhausted.";
+		else if(a->stamina < a->sspecies->stamina/2) s += " It looks sweaty.";
+		if(a->health > (3*a->sspecies->min_health)/4) s+= " It looks healthy.";
+		else if(a->health > (a->sspecies->min_health/2)) s += "It looks slightly wounded.";
+		else if(a->health > (a->sspecies->min_health/4)) s += "It looks heavily wounded.";
+		else s += "It looks close to death.";
+		if(a->sspecies->psychic_range) s+= " It is psychic.";
+	    if(a->sspecies->smell_clarity >= 1.0f) s += " It has a good sense of smell.";
+		else if(a->sspecies->smell_clarity != 0.0f) s += " It has a sense of smell.";
+		if(a->sspecies->vis_range >= 8) s += " It can see well.";
+		else if(a->sspecies->vis_range >= 4) s+= " It can just about see.";
+
+	}
 	pretty_print(s);
 	getch();
 	draw_scene();
@@ -2343,7 +2793,8 @@ void kill_actor(actor* a)
 	map_occupants[a->x][a->y] = NULL;
 	if(current_target == a) current_target = NULL;
 	a->dead = true;
-	if(sym_los_in_range(p_ptr->x,p_ptr->y,a->x,a->y))
+	//if(sym_los_in_range(p_ptr->x,p_ptr->y,a->x,a->y,is_opaque))
+	if(tile_visible(a->x,a->y))
 	{
 		add_message("The "+a->sspecies->name+" dies.");
 	}
@@ -2351,9 +2802,50 @@ void kill_actor(actor* a)
 	add_junk(a->sspecies->name +" corpse","the bloody corpse of a "+a->sspecies->name,'%',a->sspecies->colour,a->x,a->y);
 }
 
+
+int calculate_score()
+{
+	int score = 0;
+	score += died ? -1000 : 1000;
+	score += left_ship ? 50 : -50;
+	score += ran ? 75 : -75;
+	score += entered_building_destroyed_transmitter ? 100 : -100;
+	score += destroyed_transmitter ? 200 : -200;
+	score += returned_to_ship ? 400 : -400;
+	score += closed_doors ? 600 : -600;
+	score += left_planet ? 800 : -800;
+
+	score += count_inv_devices(LOW_EXPLOSIVE)*100;
+	score += count_inv_devices(HIGH_EXPLOSIVE)*400;
+	score += count_inv_devices(HOLOGRAM_PROJECTOR)*50;
+	score += count_inv_devices(NOISE_GENERATOR)*50;
+	score += count_inv_devices(SCENT_GENERATOR)*50;
+	score += count_inv_devices(BRAIN_SLICE)*50;
+
+	score += ammo[PISTOL]*5;
+	score += ammo[RIFLE]*3;
+	score += ammo[CANNON]*25;
+	score -= turn_count;
+	score *= difficulty;
+	return score;
+}
+
+void add_score_str()
+{
+	check_achievements();
+	char score_str[10] = "";
+	sprintf(score_str,"%d",calculate_score());
+	//itoa(calculate_score(),score_str,10);
+	add_message("Your score is " + std::string(score_str) + ".");
+}
+
 void lose()
 {
+	died = true;
+	
 	add_message("You die. Press 'Q' to quit.");
+	
+	add_score_str();
 	draw_scene();
 	int kp = 0;
 	while(kp != 'Q') kp = fgetch();
@@ -2361,6 +2853,7 @@ void lose()
 	exit(0);
 
 }
+
 void win()
 {
 	if(map_terrain[ship_x+2][ship_y] == DOOR)
@@ -2371,6 +2864,10 @@ void win()
 	{
 		add_message("You wipe some blood off the control panel and fly away! Press Q to quit.");
 	}
+	check_achievements();
+	closed_doors = true;
+	left_planet = true;
+	add_score_str();
 	map_terrain[ship_x+2][ship_y] = NS;
 	draw_scene();
 	int kp = 0;
@@ -2396,6 +2893,7 @@ void hurt_actor(actor* a,int damage)
 void do_explosion(explosion ex)
 {
 	make_noise(ex.x,ex.y,&(ex.radius <3?LE_noise:HE_noise));
+	add_message("BOOM!");
 	int dam = 0;
 	for(int i = -ex.radius; i<= ex.radius; i++)
 	{
@@ -2414,6 +2912,7 @@ void do_explosion(explosion ex)
 						map_items[ex.x+i][ex.y+j] = NULL;
 						target_x = -500; target_y = -500;
 						add_message("Perhaps the ship will stop pretending to be docked now!");
+						destroyed_transmitter = true;
 
 					}
 				}
@@ -2426,17 +2925,20 @@ void do_explosion(explosion ex)
 					hurt_actor(map_occupants[ex.x+i][ex.y+j],dam);
 				}
 			}
-			if(dam>=10)
+			switch(map_terrain[ex.x+i][ex.y+j])
 			{
-				switch(map_terrain[ex.x+i][ex.y+j])
-				{
 				case WALL:
-					map_terrain[ex.x+i][ex.y+j] = FLOOR; break;
+					if(dam >= 7)
+						map_terrain[ex.x+i][ex.y+j] = FLOOR; break;
 				case BTREE:
-					map_terrain[ex.x+i][ex.y+j] = DIRT; break;
+					if(dam >= 11)
+						map_terrain[ex.x+i][ex.y+j] = DIRT; break;
 				case STREE:
-					map_terrain[ex.x+i][ex.y+j] = DIRT; break;
-				}
+					if(dam >= 3)
+						map_terrain[ex.x+i][ex.y+j] = DIRT; break;
+				case TWINDOW:
+					if(dam >= 5)
+						map_terrain[ex.x+i][ex.y+j] = FLOOR; break;
 			}
 		}
 	}
@@ -2451,7 +2953,7 @@ void melee_attack(actor* attacker, actor* defender)
 
 bool fire_weapon(int x1, int y1, int x2, int y2)
 {
-	if(los_exists(x1,y1,x2,y2))
+	if(los_exists(x1,y1,x2,y2,blocks_shots))
 	{
 		add_message("BANG!");
 		int damage = 0;
@@ -2471,8 +2973,33 @@ bool fire_weapon(int x1, int y1, int x2, int y2)
 				break;
 		}
 		actor* victim = map_occupants[x2][y2];
+		bool crit = false;
+		if(victim != NULL)
+		{
+			species* vsp = victim->sspecies;
+
+			int bss = vsp->body_sections;
+			int bst = vsp->body_sections_tried;
+			int bsr = bss - bst; // body sections remaining. 1 if crit_known
+			int bs = rand()%bsr; // aim at a body section that could be the crit section
+			if(rand()%3) // miss
+			{
+				bs = rand()%bss; // hit anywhere
+			}
+			crit = (bs == 0);
+			if(crit) {vsp->body_sections_tried = vsp->body_sections - 1;} // if you crit, you learn how
+			else if(bs < bsr) {vsp->body_sections_tried += 1;}
+			if(vsp->body_sections_tried == vsp->body_sections - 1) {vsp->crit_known = true;}
+			if(vsp->body_sections_tried >= vsp->body_sections) {vsp->body_sections_tried = vsp->body_sections - 1;} // just make sure
+		}
+		
 		if(current_weapon == CANNON)
 		{
+			if(crit)
+			{
+				add_message("The "+victim->sspecies->name+" is hit in the "+victim->sspecies->crit_part_name+"!!!");
+				hurt_actor(victim,damage);
+			}
 			explosion ex;
 			ex.x = x2; ex.y = y2;
 			ex.centre_damage = damage; ex.radius = 1;
@@ -2481,9 +3008,14 @@ bool fire_weapon(int x1, int y1, int x2, int y2)
 		else
 		if(victim != NULL)
 		{
-			add_message("The "+victim->sspecies->name+" is hit!");
-			
+			if(crit)
 			{
+				add_message("The "+victim->sspecies->name+" is hit in the "+victim->sspecies->crit_part_name+"!!!");
+				hurt_actor(victim,2*damage);
+			}
+			else
+			{
+			add_message("The "+victim->sspecies->name+" is hit!");
 			hurt_actor(victim,damage);
 			}
 			return true;
@@ -2494,6 +3026,13 @@ bool fire_weapon(int x1, int y1, int x2, int y2)
 		add_message("Can't get a clear shot!"); 
 		draw_last_msg();
 		return false;
+	}
+	if(target_x == x2 && target_y == y2)
+	{
+		if(current_weapon == PISTOL || current_weapon == RIFLE)
+		{
+			add_message("Use explosives to destroy the transmitter!");
+		}
 	}
 	return true;
 }
@@ -2601,28 +3140,34 @@ void ai_turn(actor* a)
 			a->certain = true;
 		}
 	}
-	if(uncertain && d22(a->x,a->y,p_ptr->x,p_ptr->y) <= squarei(a->sspecies->vis_range))
+	if(uncertain/* && d22(a->x,a->y,p_ptr->x,p_ptr->y) <= squarei(a->sspecies->vis_range)*/)
 	{
 		std::vector<actor*> visible;
-		if(symmetrical_los(a->x,a->y,p_ptr->x,p_ptr->y))
+		if(d22(a->x,a->y,p_ptr->x,p_ptr->y) <= squarei(a->sspecies->vis_range))
 		{
-			visible.push_back(p_ptr);
+			if(symmetrical_los(a->x,a->y,p_ptr->x,p_ptr->y,is_opaque))
+			{
+				visible.push_back(p_ptr);
+			}
 		}
 		for(unsigned int i = 0; i<holograms.size();i++)
 		{
-			if(symmetrical_los(a->x,a->y,holograms[i]->x,holograms[i]->y))
+			if(d22(a->x,a->y,holograms[i]->x,holograms[i]->y) <= squarei(a->sspecies->vis_range))
 			{
-				visible.push_back(holograms[i]);
+				if(symmetrical_los(a->x,a->y,holograms[i]->x,holograms[i]->y,is_opaque))
+				{
+					visible.push_back(holograms[i]);
+				}
 			}
 		}
 		if(visible.size())
 		{
 			actor* vis_target = visible[rand()%visible.size()];
 
-			if(symmetrical_los(a->x,a->y,vis_target->x,vis_target->y))
+			//if(symmetrical_los(a->x,a->y,vis_target->x,vis_target->y,is_opaque)) //already checked this once
 			{
 				set_ai_target(a,overshoot(a->x,a->y,vis_target->x,vis_target->y));
-				if((vis_target->running ? human_sp->run_energy : human_sp->walk_energy) > a->sspecies->walk_energy
+				if((vis_target->running ? vis_target->sspecies->run_energy : vis_target->sspecies->walk_energy) >= a->sspecies->walk_energy
 					&& a->stamina > a->sspecies->stamina/4)
 				{
 					a->running = true;
@@ -2647,7 +3192,10 @@ void ai_turn(actor* a)
 		}
 		random_walk(a); return;
 	}
+	if(!uncertain && rand()%4==0)
+	{
 	make_noise(a->x,a->y,&screech);
+	}
 	int dx = (a->x) - (a->ai_x);
 	int dy = (a->y) - (a->ai_y);
 	int best = d1(a->x,a->y,a->ai_x,a->ai_y)+2;
@@ -2687,12 +3235,10 @@ void update_map_seen()
 		{
 			if(on_map(x,y))
 			{
-				if(in_vis_range(x,y,px,py))
+				if (!map_seen[x][y])
 				{
-					if (!map_seen[x][y])
-					{
-						map_seen[x][y] = symmetrical_los(x,y,px,py);
-					}
+					if(tile_visible(x,y))
+						map_seen[x][y] = true;
 				}
 			}
 		}
@@ -3016,20 +3562,21 @@ item* select_individual_device()
 			if(device_type >= 0)
 			{
 				
-				int t = ask_for_time();
+				/*int t = ask_for_time();
 			
-				if (t >= 0)
+				if (t >= 0)*/
 				{
 					item* dev = dev_inv[device_type][UNCONFIGURED].back();
-					set_timer(dev,t);
-					dev_inv[device_type][UNCONFIGURED].pop_back();
+					/*set_timer(dev,t);
+					dev_inv[device_type][UNCONFIGURED].pop_back();*/
 					return dev;
 				}
-				else
-				{
-					return NULL;
-				}
-			}/*
+			}
+				//else
+				//{
+				//	return NULL;
+				//}
+				/*}
 			{
 				int device_configuration = 999;
 				while(device_configuration != -1)
@@ -3083,7 +3630,7 @@ int autotarget()
 			tab_ind = 0;
 		}
 	}
-	if(!symmetrical_los(current_target->x,current_target->y,p_ptr->x,p_ptr->y))
+	if(!symmetrical_los(current_target->x,current_target->y,p_ptr->x,p_ptr->y,is_opaque))
 	{
 		if(visible_actors.size() == 0)
 		{
@@ -3101,11 +3648,11 @@ int autotarget()
 void player_turn(actor* a)
 {
 	update_map_seen();
-	draw_scene(true);
+	//draw_scene(true);
 	int turn = -1;
 	while(turn)
 	{
-		draw_scene();
+		draw_scene(true);
 		int kp;
 		if(!forcefed_help)
 		{
@@ -3236,6 +3783,7 @@ void player_turn(actor* a)
 				page++;
 				kp = fgetch();
 				draw_scene();
+				//clear_area(0,0,viewport_width,message_area_height+1);
 				if(!forcefed_help && page != 4)
 				{
 					kp = '?';
@@ -3250,7 +3798,7 @@ void player_turn(actor* a)
 		case 'Z':
 			if(current_weapon != CANNON) {turn = 0; add_message("You get out the plasma cannon!!"); current_weapon = CANNON;} break;
 		case 'r':
-			turn = 0; add_message(signal_receive(p_ptr->x,p_ptr->y)); draw_last_msg(); break;
+			turn = 0; add_message(signal_receive(p_ptr->x,p_ptr->y)); /*draw_last_msg();*/ break;
 		case 'g':
 			if(count_inv_devices(BRAIN_SLICE) > 0)
 			{
@@ -3270,6 +3818,7 @@ void player_turn(actor* a)
 			debug = !debug; break;
 		case ' ':
 			last_message_seen = rlmessages.size();
+			last_word_seen  = rlmessage_words.size()-1;
 			draw_last_msg(); break;
 		case 'R':
 			p_ptr->running = !p_ptr->running; draw_stats(); break;
@@ -3282,6 +3831,8 @@ void player_turn(actor* a)
 				int tab_ind = autotarget();
 				int lx = current_target->x; int ly = current_target->y;
 				item* dev = select_individual_device();
+				//item* dev = dev_inv[device_type][UNCONFIGURED].back();
+				int t = ask_for_time();
 				if(dev == NULL) break;
 			while(current_mode==THROW_MODE)
 			{
@@ -3322,13 +3873,13 @@ void player_turn(actor* a)
 					lx = std::min(lx+1,viewport_right_edge()); ly = std::min(ly+1,viewport_bottom_edge()); break;
 				case 't':
 					{
-						if(los_exists(p_ptr->x,p_ptr->y,lx,ly))
+						if(los_exists(p_ptr->x,p_ptr->y,lx,ly,blocks_shots))
 						{
 							//if(dev != NULL)
 							{
 								item_to_location(dev,lx,ly);
 								inv_remove(dev);
-
+								set_timer(dev,t);
 								turn = 0;
 								current_mode = WALK_MODE;
 								dev->player_has = false;
@@ -3364,6 +3915,7 @@ void player_turn(actor* a)
 					map_terrain[ship_x+2][ship_y] = NS;
 					turn = 0;
 					add_message("You tell the computer to close the doors.");
+					closed_doors = true;
 				}
 				else
 				{
@@ -3500,6 +4052,7 @@ int play_turn()
 				act->energy += act->sspecies->walk_energy;
 				if(act->running)
 				{
+					if(act == p_ptr) ran = true;
 					int stamina_consumed = (act->stamina * (act->sspecies->run_energy - act->sspecies->walk_energy))/act->sspecies->stamina;
 					act->energy += std::min(stamina_consumed,act->stamina);
 					act->stamina -=  std::min(stamina_consumed,act->stamina);
@@ -3533,6 +4086,8 @@ int play_turn()
 						}
 						act->energy -= 100;
 						player_turn(act);
+						check_achievements();
+
 						act->most_noticeable_sound = 0.0;
 						sound_this_turn = "";
 						dir_this_turn = "";
@@ -3650,7 +4205,7 @@ int play_turn()
 		}
 		if(rand()%4000+150+turn_count >4000 && rand()%(45-6*(difficulty-5)) == 0)
 		{
-			std::pair<int,int> loc = random_occupiable_square();
+			std::pair<int,int> loc = random_occupiable_square_away_from_player();
 
 			add_actor(zoo[rand()%ZOO_SIZE+1],false,loc.first,loc.second);
 		}
