@@ -52,7 +52,7 @@ disallow targetting and object placement outside map bounds
 */
 
 /*
-TODO for first non-7drl version:
+TODO for ARRP:
 
 *rebalance distractions/monster senses to make them useful (but still not overpowered)
 *completely rescale difficulty
@@ -409,7 +409,7 @@ void pretty_print_message_words()
 			word = rlmessage_words[word_number];
 			position = word.length();
 		}
-		unsigned int line_chars_remaining = viewport_width - 1 - line_so_far.length();
+		int line_chars_remaining = viewport_width - 1 - line_so_far.length();
 		if(line_chars_remaining >= position+1) // whole remainder of word fits
 		{
 			line_so_far = word.substr(0,position) + ' ' + line_so_far;
@@ -812,9 +812,9 @@ std::string random_syllable()
 	}
 }
 
-void init_species()
+void init_human_sp()
 {
-	species* human = new species();
+		species* human = new species();
 	human->id = 0;
 	human->health_range = 0; human->min_health = 100;
 	human->ch = '@';
@@ -833,6 +833,15 @@ void init_species()
 	human->crit_part_name = "head";
 	human->crit_known = true;
 	human->size = 1;
+	
+	
+	human->description = "A legendary advanced alien race whose technology is built specifically for murder, ecological destruction, deception, and gentle shaking. Members of this species must be killed immediately upon discovery to prevent catastrophic damage to the whole area.";
+	zoo.push_back(human);
+	human_sp = human;
+}
+void init_tutorial_species()
+{
+	init_human_sp();
 	noise wn[TERRAIN_TYPES] = {{1.0,"footsteps",false},{1.5,"footsteps",false},{1.5f,"footsteps",false},{2.0,"footsteps",false},{0.0,"",false},
 	{2.3f,"footsteps",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false}};
 	walk_noise[0] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
@@ -841,11 +850,169 @@ void init_species()
 	{3.3f,"footsteps",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false}};
 	run_noise[0] = std::vector<noise>(rn,rn+TERRAIN_TYPES);
 	//delete [] rn;
-	
-	
-	human->description = "A legendary advanced alien race whose technology is built specifically for murder, ecological destruction, deception, and gentle shaking. Members of this species must be killed immediately upon discovery to prevent catastrophic damage to the whole area.";
-	zoo.push_back(human);
-	human_sp = human;
+	{
+		species* alien = new species();
+		alien->damage_known = true;
+		alien->health_known = true;
+		alien->size_known = true;
+		alien->walk_known = true;
+		alien->run_known = true;
+		alien->id = 1;
+		alien->crit_known = false;
+		alien->body_sections_tried = 0;
+		alien->size = 0;
+		alien->syl1 = "small";
+		alien->syl2 = "alien";
+		alien->ch = 's';
+		alien->name = "small alien";
+		alien->description = "A small, fast, weak, frail alien. We stole this specimen from a zoo on Mars. Actually we stole its great-great-grandparent, three days ago, and let it breed.";
+		alien->colour = COLOR_MAGENTA;
+		alien->crit_part_name = "splanchlet";
+		alien->damage = 2;
+		alien->min_health = 6;
+		alien->health_range = 0;
+		alien->body_sections = 4;
+		alien->psychic_range = 0;
+		alien->vis_range = 6;
+		alien->hearing_thres = 1.0f;
+		alien->hearing_adapt = 0.3f;
+		alien->smell_clarity = 0.15f;
+
+		alien->walk_energy = 13;
+		alien->run_energy = 21;
+		alien->stamina = 41*alien->run_energy;
+
+		std::string walk_str = "scampering";
+		std::string run_str = "scampering";
+		float extra_noise = 7.0f;
+		walk_noise[1] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
+		run_noise[1] = std::vector<noise>(rn,rn+TERRAIN_TYPES);
+		for(int i=0;i<TERRAIN_TYPES;i++)
+		{
+			walk_noise[1][i].describe = walk_str;
+			walk_noise[1][i].volume +=extra_noise;
+			run_noise[1][i].describe = run_str;
+			run_noise[1][i].volume +=extra_noise*1.6f;
+		}
+		zoo.push_back(alien);
+	}
+	{
+		species* alien = new species();
+		alien->damage_known = true;
+		alien->health_known = true;
+		alien->size_known = true;
+		alien->walk_known = true;
+		alien->run_known = true;
+		alien->id = 2;
+		alien->crit_known = false;
+		alien->body_sections_tried = 0;
+		alien->size = 0;
+		alien->syl1 = "medium";
+		alien->syl2 = "alien";
+		alien->ch = 's';
+		alien->name = "medium alien";
+		alien->description = "It's about your size, and it walks and runs at about your speed. It can take several hits before it stops chasing you. It doesn't screw around. ";
+		alien->colour = COLOR_CYAN;
+		alien->crit_part_name = "splanch";
+		alien->damage = 6;
+		alien->min_health = 14;
+		alien->health_range = 0;
+		alien->body_sections = 7;
+		alien->psychic_range = 10;
+		alien->vis_range = 8;
+		alien->hearing_thres = 8.0f;
+		alien->hearing_adapt = 0.4f;
+		alien->smell_clarity = 0.1f*(randfloat()+1.0f);
+
+		alien->walk_energy = 10;
+		alien->run_energy = 19;
+		alien->stamina = 17*alien->run_energy;
+
+		std::string walk_str = "trotting";
+		std::string run_str = "galloping";
+		float extra_noise = 9.0f;
+		walk_noise[2] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
+		run_noise[2] = std::vector<noise>(rn,rn+TERRAIN_TYPES);
+		for(int i=0;i<TERRAIN_TYPES;i++)
+		{
+			walk_noise[2][i].describe = walk_str;
+			walk_noise[2][i].volume +=extra_noise;
+			run_noise[2][i].describe = run_str;
+			run_noise[2][i].volume +=extra_noise*1.6f;
+		}
+		zoo.push_back(alien);
+	}
+	{
+		species* alien = new species();
+		alien->damage_known = true;
+		alien->health_known = true;
+		alien->size_known = true;
+		alien->walk_known = true;
+		alien->run_known = true;
+		alien->id = 1;
+		alien->crit_known = false;
+		alien->body_sections_tried = 0;
+		alien->size = 0;
+		alien->syl1 = "huge";
+		alien->syl2 = "alien";
+		alien->ch = 's';
+		alien->name = "huge alien";
+		alien->description = "If you took a mammoth on steroids and rearranged its bodyparts, maybe you'd end up with something like this alien's head. You don't want to let this get near you. Fortunately, it moves very slowly.";
+		alien->colour = COLOR_YELLOW;
+		alien->crit_part_name = "splanchum";
+		alien->damage = 18;
+		alien->min_health = 26;
+		alien->health_range = 0;
+		alien->body_sections = 12;
+		alien->psychic_range = 24;
+		alien->vis_range = 4;
+		alien->hearing_thres = 11.0f;
+		alien->hearing_adapt = 0.3f;
+		alien->smell_clarity = 0.1f*(randfloat()+1.0f);
+
+		alien->walk_energy = 6;
+		alien->run_energy = 11;
+		alien->stamina = 41*alien->run_energy;
+
+		std::string walk_str = "thumping";
+		std::string run_str = "charging";
+		float extra_noise = 11.5f;
+		walk_noise[3] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
+		run_noise[3] = std::vector<noise>(rn,rn+TERRAIN_TYPES);
+		for(int i=0;i<TERRAIN_TYPES;i++)
+		{
+			walk_noise[3][i].describe = walk_str;
+			walk_noise[3][i].volume +=extra_noise;
+			run_noise[3][i].describe = run_str;
+			run_noise[3][i].volume +=extra_noise*1.6f;
+		}
+		zoo.push_back(alien);
+	}
+	for(int i=4; i<ZOO_SIZE+1; i++)
+	{
+		species* alien = new species();
+		alien->damage_known = false;
+		alien->health_known = false;
+		alien->size_known = false;
+		alien->walk_known = false;
+		alien->run_known = false;
+		alien->id = i;
+		alien->crit_known = false;
+		alien->ch = ' ';
+	}
+}
+
+void init_species()
+{
+	init_human_sp();
+	noise wn[TERRAIN_TYPES] = {{1.0,"footsteps",false},{1.5,"footsteps",false},{1.5f,"footsteps",false},{2.0,"footsteps",false},{0.0,"",false},
+	{2.3f,"footsteps",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false}};
+	walk_noise[0] = std::vector<noise>(wn,wn+TERRAIN_TYPES);
+	//delete [] wn;
+	noise rn[TERRAIN_TYPES] = {{2.0,"footsteps",false},{3.0,"footsteps",false},{3.5f,"footsteps",false},{3.0,"footsteps",false},{0.0,"",false},
+	{3.3f,"footsteps",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false},{0.0,"",false}};
+	run_noise[0] = std::vector<noise>(rn,rn+TERRAIN_TYPES);
+	//delete [] rn;
 	for (int spsp=1; spsp<ZOO_SIZE+1; spsp++)
 	{
 		species* alien = new species();
@@ -2139,47 +2306,59 @@ void init()
 	curs_set(0);
 	keypad(stdscr,TRUE);
 	mvaddstr(4,10,"Choose a difficulty level (0 to 9):");
-	mvaddstr(5,13,"0 is too easy, 9 is too hard,");
-	mvaddstr(6,10,"2 is ok for beginners, 5 is standard");
+	mvaddstr(5,13,"2 is too easy, 9 is too hard,");
+	mvaddstr(6,10,"3 is ok for beginners, 7 is standard");
+	//mvaddstr(8,12,"Press t for the tutorial");
 	move(7,15);
 	int kp = 0;
-	while(kp - '0' < 0 || kp - '0' > 9)
+	while((kp - '0' < 0 || kp - '0' > 9) /*&& kp != 't' && kp != 'T'*/)
 	{
 		kp = getch();
 	}
-	difficulty = kp - '0';
-	if(difficulty > 6) difficulty += (difficulty-6)*3;
-	//scratch = newpad(viewport_height,viewport_width);
-	init_species();
-	init_map();
-	init_actors();
-	init_items();
-	add_message("The ship plays a cheerful tune, and the door opens. \"Automatic docking completed. Welcome to Spaceport X7/3A! Please enjoy your stay.\"");
-	std::vector<std::pair<int,int>> transmitter_options;
-	int acceptable_range = 70;
-	while(transmitter_options.size() == 0)
+	//if (kp == 't' || kp == 'T')
+	//{
+	//	difficulty = -1;
+	//	init_tutorial_species();
+	//	init_tutorial_map();
+	//	init_tutorial_actors();
+	//	init_tutorial_items();
+	//}
+	//else
 	{
-		for(int x = 0; x < MAP_SIZE; x++)
+		difficulty = kp - '0';
+		if(difficulty > 6) difficulty += (difficulty-6)*3;
+		//scratch = newpad(viewport_height,viewport_width);
+		init_species();
+		init_map();
+		init_actors();
+		init_items();
+		add_message("The ship plays a cheerful tune, and the door opens. \"Automatic docking completed. Welcome to Spaceport X7/3A! Please enjoy your stay.\"");
+		std::vector<std::pair<int,int>> transmitter_options;
+		int acceptable_range = 70;
+		while(transmitter_options.size() == 0)
 		{
-			for(int y = 0; y < MAP_SIZE; y++)
+			for(int x = 0; x < MAP_SIZE; x++)
 			{
-				if(map_terrain[x][y] == FLOOR && d22(x,y,ship_x, ship_y) > acceptable_range*acceptable_range)
-					transmitter_options.push_back(std::make_pair(x,y));
+				for(int y = 0; y < MAP_SIZE; y++)
+				{
+					if(map_terrain[x][y] == FLOOR && d22(x,y,ship_x, ship_y) > acceptable_range*acceptable_range)
+						transmitter_options.push_back(std::make_pair(x,y));
+				}
 			}
+			acceptable_range--;
 		}
-		acceptable_range--;
-	}
 
-	std::pair<int,int> target_pair = transmitter_options[rand()%transmitter_options.size()];
-	target_x = target_pair.first; target_y = target_pair.second;
-	//target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
+		std::pair<int,int> target_pair = transmitter_options[rand()%transmitter_options.size()];
+		target_x = target_pair.first; target_y = target_pair.second;
+		//target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
 	
-	/*while(map_terrain[target_x][target_y] != FLOOR || d22(ship_x,ship_y,target_x,target_y) <= squarei(acceptable_range))
-	{
-		target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
-		if(rand()%4 != 0) acceptable_range--;
-	}*/
-	add_junk("radio transmitter","So this is what's been causing you so much trouble!",'?',COLOR_CYAN,target_x,target_y);
+		/*while(map_terrain[target_x][target_y] != FLOOR || d22(ship_x,ship_y,target_x,target_y) <= squarei(acceptable_range))
+		{
+			target_x = rand()%MAP_SIZE; target_y = rand()%MAP_SIZE;
+			if(rand()%4 != 0) acceptable_range--;
+		}*/
+		add_junk("radio transmitter","So this is what's been causing you so much trouble!",'?',COLOR_CYAN,target_x,target_y);
+	}
 }
 
 
@@ -3735,6 +3914,7 @@ void player_turn(actor* a)
 				  "  Hologram (C), Noise (D), Scent (E),             "
 				  "  Brain slice (F) (for psychic aliens)            "
 				  " Set a timer from 0 to 9 when throwing.           "
+				  " All of these have very useful spy cameras.       "
 				  "                                                  "
 				  "       Press ? again for more info.               "
 				  "                                                  "

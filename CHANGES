@@ -39,9 +39,9 @@ Update 4 (ARRP 2012):
 * Overhaul terrain destruction - different terrain types take different damage amounts
 * Cannon shots can destroy walls and windows (walls unreliably)
 * Add critical hits (shoot a monster several times to figure out where it's vulnerable)
-* Hologram projectors give LOS to the player, now function as spy cameras as well as distractions
+* Hologram, sound, scent, and brain devices all give LOS to the player, so they now function as spy cameras as well as distractions
 * Overhaul message display to allow partial messages in the message log.
-* Include monster health/stamina descriptions and finer stat descriptions from Mutant Aristocrats!
+* Include monster health/stamina descriptions, sense descriptions (don't need to be discovered) and finer stat descriptions from Mutant Aristocrats!
 * Alter sound levels to allow movement to actually be heard
 * Make monsters screech 75% less often
 * Make monsters' decision about whether to run slightly more sensible

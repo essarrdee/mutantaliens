@@ -46,6 +46,7 @@ Z                       WIELD CANNON (splash damage)
 ?                       DISPLAY HELP
 Q                       QUIT
 M                       MUTE ADVICE
+C                       CLOSE SHIP DOOR
 
 Tiles:
 . t +                   walkable, transparent
@@ -60,6 +61,7 @@ C                       Hologram (distracts enemies visually)
 D                       Noise (distracts enemies that hear it)
 E                       Scent (distracts enemies that smell it)
 F                       Brain slice (distracts psychic enemies)
+All of these have spy cameras that increase your field of vision.
 
 Memory:
 When you see a monster, your observations are recorded in the monster memory.
